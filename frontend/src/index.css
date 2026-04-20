@@ -25,10 +25,16 @@ body {
   background-color: var(--color-ps-black);
   color: #f4f4f5;
   font-family: var(--font-inter);
-  overflow: hidden;
-  height: 100vh;
-  font-size: 20px; /* Increased from 16px for TV visibility */
+  font-size: 20px; /* TV visibility */
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+@media (min-width: 768px) {
+  body {
+    overflow: hidden;
+    height: 100vh;
+  }
 }
 
 /* Custom Scrollbar */
@@ -67,7 +73,7 @@ body {
 .glass-card:hover, .glass-card:focus {
   background: rgba(40, 40, 45, 0.95);
   border-color: var(--color-ps-blue);
-  transform: translateY(-2px) scale(1.02);
+  transform: translateY(-2px);
   box-shadow: 0 0 30px var(--color-ps-blue-glow);
   outline: none;
 }
@@ -75,12 +81,6 @@ body {
 /* Sidebar Item Focus */
 button:focus {
   outline: none;
-}
-
-nav button:focus {
-  background: var(--color-ps-blue);
-  color: white;
-  box-shadow: 0 0 20px var(--color-ps-blue-glow);
 }
 
 /* Neon Glows */

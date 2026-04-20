@@ -24,14 +24,16 @@ import {
   Info,
   ChevronUp,
   ChevronDown,
-  Heart
+  Heart,
+  Menu,
+  X
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import './App.css'
 
 // --- Utilities ---
-const isPS5 = /PlayStation 5/i.test(navigator.userAgent);
+const isPS5 = /PlayStation/i.test(navigator.userAgent);
 
 function cn(...inputs) {
   return twMerge(clsx(inputs))
@@ -65,11 +67,12 @@ const parsePayloadName = (path) => {
 const PayloadName = ({ path, className, versionClassName }) => {
   const { displayName, version, isDelay } = parsePayloadName(path);
   return (
-    <div className={cn("flex items-center space-x-3", className)}>
-      {isDelay && <Zap className="w-4 h-4 text-ps-blue" />}
-      <span className="font-bold uppercase tracking-tight">{displayName}</span>
+    <div className={cn("flex items-center space-x-2 min-w-0 flex-1", className)}>
+      {isDelay && <Zap className="w-4 h-4 text-ps-blue shrink-0" />}
+      <span className="font-bold truncate shrink">{displayName}</span>
       {version && (
-        <span className={cn("px-2 py-0.5 bg-white/10 text-ps-blue text-[10px] font-black uppercase rounded-md border border-white/5", versionClassName)}>
+        <span className={cn(
+          "text-[9px] px-1 py-0.5 rounded-md font-black uppercase tracking-tighter border border-white/10 bg-white/5 text-ps-blue shrink-0", "px-2 py-0.5 bg-white/10 text-ps-blue text-[10px] font-black uppercase rounded-md border border-white/5", versionClassName)}>
           {version}
         </span>
       )}
@@ -126,22 +129,43 @@ const Modal = ({ show, title, children, onClose, footer }) => {
   )
 }
 
-const NavButton = ({ active, onClick, icon: Icon, label, mobileLabel, className }) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      "flex flex-col md:flex-row items-center md:space-x-3 px-4 md:px-6 py-2 md:py-3 rounded-2xl font-bold transition-all border",
-      active ? "bg-ps-blue border-ps-blue text-white shadow-[0_0_20px_rgba(0,112,209,0.3)]" : "bg-transparent border-transparent text-zinc-400 hover:text-white hover:bg-white/5",
-      className
-    )}
-  >
-    <Icon className="w-5 h-5 md:w-5 md:h-5 mb-1 md:mb-0" />
-    <span className="uppercase tracking-tighter text-[10px] md:text-sm">
-      <span className="hidden md:inline">{label}</span>
-      <span className="inline md:hidden">{mobileLabel}</span>
-    </span>
-  </button>
-)
+const NavButton = ({ active, onClick, icon: Icon, label, mobileLabel, className, sidebar, sidebarExpanded, showSeparator }) => {
+  const isDonate = label === 'Donate';
+  return (
+    <div className="flex items-center flex-1 md:flex-none">
+      {showSeparator && <div className="w-px h-6 bg-white/10 md:hidden" />}
+      <button
+        onClick={onClick}
+        className={cn(
+          "flex items-center transition-all border group relative outline-none",
+          sidebar
+            ? cn("w-full p-4 mb-2 rounded-2xl border-none", sidebarExpanded ? "justify-start space-x-4" : "justify-center")
+            : (isPS5 ? "flex-row space-x-3 px-6 py-3 rounded-2xl" : "flex-col md:flex-row md:space-x-3 px-4 md:px-6 py-2 md:py-3 rounded-2xl border-none flex-1 md:flex-none"),
+          active
+            ? (sidebar
+              ? (isDonate ? "bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.3)]" : "bg-ps-blue text-white shadow-[0_0_20px_rgba(0,112,209,0.3)]")
+              : (isDonate ? "text-red-500" : "text-ps-blue font-black"))
+            : (isDonate ? "text-red-500/60" : "bg-transparent text-zinc-400 hover:text-white"),
+          className
+        )}
+      >
+        <Icon className={cn(
+          "w-6 h-6 shrink-0 group-hover:scale-110 transition-transform",
+          active ? (sidebar ? "text-white" : (isDonate ? "text-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]" : "text-ps-blue shadow-[0_0_10px_rgba(0,149,255,0.5)]")) : (isDonate ? "text-red-500" : "")
+        )} />
+        <span className={cn(
+          "uppercase tracking-tighter transition-all duration-300 whitespace-nowrap overflow-hidden",
+          sidebar
+            ? (sidebarExpanded ? "opacity-100 w-auto font-black italic text-sm" : "opacity-0 w-0")
+            : (isPS5 ? "text-sm font-bold" : "text-[10px] md:text-sm")
+        )}>
+          <span className={cn((isPS5 || sidebar) ? "inline" : "hidden md:inline")}>{label}</span>
+          {!isPS5 && !sidebar && <span className={cn("inline md:hidden", active ? (isDonate ? "text-red-500" : "text-ps-blue") : "font-medium text-zinc-500")}>{mobileLabel}</span>}
+        </span>
+      </button>
+    </div>
+  )
+}
 
 const PayloadButton = ({ path, onClick, isLoading }) => {
   const name = path.split('/').pop().replace(/\.(elf|bin|lua)$/i, '').replace(/_/g, ' ')
@@ -184,139 +208,162 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
   }, [status.done]);
 
   return (
-    <div className="fixed inset-0 bg-black/98 z-[9999] flex flex-col items-center justify-center p-8">
-      <div className="relative text-center space-y-10 max-w-2xl w-full">
-        {/* Conflict Warning (Only during active phases) */}
-        {!isDone && (payloadList.some(p => p.toLowerCase().includes('etahen')) &&
-          payloadList.some(p => p.toLowerCase().includes('kstuff'))) && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/50 rounded-2xl flex items-center justify-center space-x-3 text-amber-500 animate-in fade-in">
-              <AlertTriangle className="w-5 h-5" />
-              <span className="font-bold uppercase tracking-tight text-xs">Conflict: etaHEN + KStuff active</span>
-            </div>
-          )}
+    <div className="fixed inset-0 bg-black/98 z-[9999] flex flex-col items-center justify-center p-6 md:p-12 overflow-y-auto custom-scrollbar">
+      <div className={cn(
+        "relative w-full max-w-[1400px] flex flex-col items-center",
+        "md:flex-row md:items-start md:justify-center md:space-x-24 md:space-y-0 space-y-12"
+      )}>
 
-        {/* Stable Status Header - Fixed height prevents jumping */}
-        <div className="h-[320px] flex flex-col items-center justify-center">
-          {isCountdown && (
-            <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-              <p className="text-ps-blue font-black tracking-[0.4em] uppercase text-lg">Autoloading Sequence</p>
-              <div className="relative h-48 w-48 mx-auto flex items-center justify-center">
-                <svg className="absolute inset-0 w-full h-full -rotate-90">
-                  <circle cx="96" cy="96" r="80" fill="none" stroke="currentColor" strokeWidth="6" className="text-white/5" />
-                  <circle
-                    cx="96" cy="96" r="80"
-                    fill="none" stroke="currentColor" strokeWidth="6"
-                    strokeDasharray="502"
-                    strokeDashoffset={502 - (502 * (status.remaining / 5))}
-                    className="text-ps-blue transition-all duration-1000 ease-linear"
-                  />
-                </svg>
-                <span className="text-7xl font-black text-white tabular-nums leading-none">
-                  {status.remaining}
-                </span>
+        {/* LEFT COLUMN: Status, Countdown, Success, Actions */}
+        <div className="w-full max-w-md flex flex-col items-center space-y-10 md:sticky md:top-0">
+          {/* Conflict Warning */}
+          {!isDone && (payloadList.some(p => p.toLowerCase().includes('etahen')) &&
+            payloadList.some(p => p.toLowerCase().includes('kstuff'))) && (
+              <div className="w-full p-4 bg-amber-500/10 border border-amber-500/50 rounded-2xl flex items-center justify-center space-x-3 text-amber-500 animate-in fade-in">
+                <AlertTriangle className="w-5 h-5" />
+                <span className="font-bold uppercase tracking-tight text-xs">Conflict: etaHEN + KStuff active</span>
               </div>
-            </div>
-          )}
+            )}
 
-          {isExecuting && (
-            <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-              <p className="text-ps-blue font-black tracking-[0.4em] uppercase text-lg">Executing Payloads</p>
-              <div className="relative h-48 w-48 mx-auto flex items-center justify-center">
-                <svg className="absolute inset-0 w-full h-full -rotate-90">
-                  <circle cx="96" cy="96" r="80" fill="none" stroke="currentColor" strokeWidth="6" className="text-white/5" />
-                  <circle
-                    cx="96" cy="96" r="80"
-                    fill="none" stroke="currentColor" strokeWidth="6"
-                    strokeDasharray="502"
-                    strokeDashoffset={502 - (502 * progress)}
-                    className="text-ps-blue transition-all duration-500 ease-out"
-                  />
-                </svg>
-                <span className="text-5xl font-black text-white tabular-nums leading-none">
-                  {Math.round(progress * 100)}%
-                </span>
-              </div>
-            </div>
-          )}
-
-          {isDone && (
-            <div className="flex flex-col items-center space-y-6 animate-in zoom-in duration-500">
-              <div className="bg-emerald-500 text-white p-8 rounded-full shadow-[0_0_60px_rgba(16,185,129,0.5)]">
-                <CheckCircle2 className="w-16 h-16" />
-              </div>
-              <div className="text-center">
-                <h2 className="text-5xl font-black text-white uppercase tracking-tighter">Sequence Complete</h2>
-                <p className="text-zinc-500 font-bold uppercase text-sm tracking-[0.2em] mt-2">All payloads loaded successfully</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Payload Checklist - Fixed Height with Autoscroll */}
-        <div
-          ref={listRef}
-          className="w-full space-y-4 h-[350px] overflow-y-auto custom-scrollbar p-6 bg-white/5 rounded-3xl border border-white/10 shadow-inner scroll-smooth"
-        >
-          <div className="flex items-center justify-between mb-4 px-2 sticky top-0 bg-black/80 backdrop-blur-md py-2 z-10 rounded-xl">
-            <h3 className="label-caps !text-zinc-500 text-xs">Payload Checklist</h3>
-            <span className="text-zinc-400 font-bold text-sm">
-              {isDone ? status.total : status.done} / {status.total}
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            {payloadList.map((name, i) => {
-              const active = !isDone && isExecuting && i === status.done;
-              const done = isDone || i < status.done;
-              return (
-                <div
-                  key={i}
-                  data-active={active}
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-500 ${active ? 'bg-ps-blue/20 border-ps-blue shadow-[0_0_30px_rgba(0,149,255,0.1)] scale-105 z-10' :
-                    done ? 'bg-emerald-500/5 border-emerald-500/20 opacity-90' : 'bg-white/10 border-white/10 opacity-50'
-                    }`}>
-                  <div className="flex items-center space-x-4">
-                    {done ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> :
-                      active ? <Loader2 className="w-5 h-5 text-ps-blue animate-spin" /> :
-                        <div className="w-5 h-5 rounded-full border-2 border-white/10" />}
-                    <PayloadName
-                      path={name}
-                      className={active ? 'text-white' : 'text-zinc-300'}
-                      versionClassName={active ? 'bg-ps-blue text-white border-transparent' : ''}
+          {/* Status Header */}
+          <div className="h-[320px] w-full flex flex-col items-center justify-center">
+            {isCountdown && (
+              <div className="space-y-8 animate-in fade-in zoom-in duration-300 text-center">
+                <p className="text-ps-blue font-black tracking-[0.4em] uppercase text-xl">Autoloading</p>
+                <div className="relative h-56 w-56 mx-auto flex items-center justify-center">
+                  <svg className="absolute inset-0 w-full h-full -rotate-90 scale-110">
+                    <circle cx="112" cy="112" r="100" fill="none" stroke="currentColor" strokeWidth="8" className="text-white/5" />
+                    <circle
+                      cx="112" cy="112" r="100"
+                      fill="none" stroke="currentColor" strokeWidth="8"
+                      strokeDasharray="628"
+                      strokeDashoffset={628 - (628 * (status.remaining / 5))}
+                      className="text-ps-blue transition-all duration-1000 ease-linear"
                     />
-                  </div>
-                  {done && (
-                    <span className="text-emerald-500 text-[10px] font-black uppercase tracking-widest">
-                      Done
-                    </span>
-                  )}
+                  </svg>
+                  <span className="text-8xl font-black text-white tabular-nums leading-none">
+                    {status.remaining}
+                  </span>
                 </div>
-              )
-            })}
+                <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm">Waiting for manual abort...</p>
+              </div>
+            )}
+
+            {isExecuting && (
+              <div className="space-y-8 animate-in fade-in zoom-in duration-300 text-center">
+                <p className="text-ps-blue font-black tracking-[0.4em] uppercase text-xl">Executing</p>
+                <div className="relative h-56 w-56 mx-auto flex items-center justify-center">
+                  <svg className="absolute inset-0 w-full h-full -rotate-90 scale-110">
+                    <circle cx="112" cy="112" r="100" fill="none" stroke="currentColor" strokeWidth="8" className="text-white/5" />
+                    <circle
+                      cx="112" cy="112" r="100"
+                      fill="none" stroke="currentColor" strokeWidth="8"
+                      strokeDasharray="628"
+                      strokeDashoffset={628 - (628 * progress)}
+                      className="text-ps-blue transition-all duration-500 ease-out"
+                    />
+                  </svg>
+                  <span className="text-6xl font-black text-white tabular-nums leading-none">
+                    {Math.round(progress * 100)}%
+                  </span>
+                </div>
+                <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm italic">Loading Payloads...</p>
+              </div>
+            )}
+
+            {isDone && (
+              <div className="flex flex-col items-center space-y-8 animate-in zoom-in duration-500">
+                <div className="bg-emerald-500 text-white p-10 rounded-full shadow-[0_0_80px_rgba(16,185,129,0.4)]">
+                  <CheckCircle2 className="w-20 h-20" />
+                </div>
+                <div className="text-center space-y-2">
+                  <h2 className="text-5xl md:text-6xl font-black text-white uppercase tracking-tighter">Sequence<br />Complete</h2>
+                  <p className="text-zinc-500 font-bold uppercase text-sm tracking-[0.2em]">All systems operational</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="w-full pt-4">
+            {isDone ? (
+              <button
+                onClick={onFinish}
+                className="w-full py-8 bg-ps-blue text-white text-3xl font-black uppercase rounded-3xl hover:bg-white hover:text-ps-blue transition-all transform active:scale-95 shadow-[0_0_50px_rgba(0,149,255,0.3)]"
+              >
+                Return to Dashboard
+              </button>
+            ) : isCountdown ? (
+              <button
+                onClick={onCancel}
+                autoFocus
+                className="w-full py-8 bg-white/10 text-white border border-white/10 text-3xl font-black uppercase rounded-3xl hover:bg-red-600 hover:border-red-600 transition-all transform active:scale-95"
+              >
+                Abort Sequence
+              </button>
+            ) : (
+              <div className="h-[92px] w-full flex items-center justify-center">
+                <div className="flex space-x-2">
+                  <div className="w-2 h-2 bg-ps-blue rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-ps-blue rounded-full animate-bounce [animation-delay:0.2s]" />
+                  <div className="w-2 h-2 bg-ps-blue rounded-full animate-bounce [animation-delay:0.4s]" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="pt-4 w-full">
-          {isDone ? (
-            <button
-              onClick={onFinish}
-              className="w-full py-8 bg-ps-blue text-white text-3xl font-black uppercase rounded-3xl hover:bg-white hover:text-ps-blue transition-all transform active:scale-95 shadow-[0_0_50px_rgba(0,149,255,0.3)]"
-            >
-              Return to Dashboard
-            </button>
-          ) : isCountdown ? (
-            <button
-              onClick={onCancel}
-              autoFocus
-              className="w-full py-8 bg-white/10 text-white border border-white/10 text-3xl font-black uppercase rounded-3xl hover:bg-red-600 hover:border-red-600 transition-all transform active:scale-95"
-            >
-              Abort Sequence
-            </button>
-          ) : (
-            /* No actions during execution */
-            <div className="h-[92px]" />
-          )}
+        {/* RIGHT COLUMN: Checklist */}
+        <div className="w-full max-w-xl flex flex-col min-h-0">
+          <div
+            ref={listRef}
+            className="w-full space-y-4 h-[400px] md:h-[650px] overflow-y-auto custom-scrollbar p-8 bg-white/5 rounded-[2.5rem] border border-white/10 shadow-2xl scroll-smooth"
+          >
+            <div className="flex items-center justify-between mb-6 px-2 sticky top-0 bg-black/80 backdrop-blur-md py-4 z-10 rounded-2xl border-b border-white/5">
+              <h3 className="label-caps !text-white !opacity-100 text-sm tracking-widest flex items-center space-x-3">
+                <ShieldCheck className="w-5 h-5 text-ps-blue" />
+                <span>Payload Checklist</span>
+              </h3>
+              <span className="bg-white/10 px-4 py-1 rounded-full text-zinc-300 font-black text-xs">
+                {isDone ? status.total : status.done} / {status.total}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {payloadList.map((name, i) => {
+                const active = !isDone && isExecuting && i === status.done;
+                const done = isDone || i < status.done;
+                return (
+                  <div
+                    key={i}
+                    data-active={active}
+                    className={cn(
+                      "flex items-center justify-between p-5 rounded-2xl border transition-all duration-500",
+                      active ? 'bg-ps-blue/20 border-ps-blue shadow-[0_0_40px_rgba(0,149,255,0.15)] scale-[1.02] z-10' :
+                        done ? 'bg-emerald-500/5 border-emerald-500/20 opacity-90' : 'bg-white/5 border-white/10 opacity-40'
+                    )}>
+                    <div className="flex items-center space-x-5">
+                      {done ? <CheckCircle2 className="w-6 h-6 text-emerald-500" /> :
+                        active ? <Loader2 className="w-6 h-6 text-ps-blue animate-spin" /> :
+                          <div className="w-6 h-6 rounded-full border-2 border-white/10" />}
+                      <PayloadName
+                        path={name}
+                        className={cn("text-xl font-bold", active ? 'text-white' : 'text-zinc-400')}
+                        versionClassName={active ? 'bg-ps-blue text-white border-transparent' : ''}
+                      />
+                    </div>
+                    {done && (
+                      <span className="text-emerald-500 text-[10px] font-black uppercase tracking-widest italic">
+                        Success
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
   )
@@ -389,8 +436,8 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
 
   if (subView === 'repo') {
     return (
-      <div className="space-y-8 animate-fade-in">
-        <div className="flex items-center space-x-6">
+      <div className="flex flex-col h-full space-y-8 animate-fade-in">
+        <div className="flex items-center space-x-6 shrink-0 px-6">
           <button onClick={() => setSubView('menu')} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10">
             <ArrowLeft className="w-6 h-6" />
           </button>
@@ -400,12 +447,12 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-32 space-y-6">
+          <div className="flex-1 flex flex-col items-center justify-center space-y-6">
             <Loader2 className="w-16 h-16 text-ps-blue animate-spin" />
             <p className="label-caps animate-pulse">Connecting to Repository...</p>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-32 space-y-6 text-center">
+          <div className="flex-1 flex flex-col items-center justify-center space-y-6 text-center">
             <AlertTriangle className="w-16 h-16 text-red-500" />
             <div className="space-y-2">
               <p className="text-xl font-bold text-white uppercase">Connection Failed</p>
@@ -419,39 +466,41 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 max-h-[70vh] overflow-y-auto p-2 custom-scrollbar">
-            {remoteStatus.map((p, i) => (
-              <div key={i} className={cn(
-                "glass-card p-6 rounded-ps-2xl flex items-center justify-between border-white/10 transition-all",
-                p.isInstalled && "opacity-50 grayscale bg-black/40"
-              )}>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-4">
-                    <span className="font-bold text-white uppercase text-xl tracking-tight">{p.filename}</span>
-                    {p.isUpdate && (
-                      <span className="text-[10px] bg-emerald-500 text-white px-2 py-1 rounded font-black uppercase tracking-widest">Update Available</span>
-                    )}
-                    {p.isInstalled && (
-                      <span className="text-[10px] bg-zinc-700 text-zinc-300 px-2 py-1 rounded font-black uppercase tracking-widest">Installed</span>
-                    )}
+          <div className="flex-1 overflow-y-auto px-6 pb-20 custom-scrollbar">
+            <div className="grid grid-cols-1 gap-6">
+              {remoteStatus.map((p, i) => (
+                <div key={i} className={cn(
+                  "glass-card p-6 rounded-ps-2xl flex items-center justify-between border-white/10 transition-all",
+                  p.isInstalled && "opacity-50 grayscale bg-black/40"
+                )}>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-4">
+                      <span className="font-bold text-white uppercase text-xl tracking-tight">{p.filename}</span>
+                      {p.isUpdate && (
+                        <span className="text-[10px] bg-emerald-500 text-white px-2 py-1 rounded font-black uppercase tracking-widest">Update Available</span>
+                      )}
+                      {p.isInstalled && (
+                        <span className="text-[10px] bg-zinc-700 text-zinc-300 px-2 py-1 rounded font-black uppercase tracking-widest">Installed</span>
+                      )}
+                    </div>
+                    <p className="text-md text-zinc-300 font-medium max-w-2xl">{p.description}</p>
                   </div>
-                  <p className="text-md text-zinc-300 font-medium max-w-2xl">{p.description}</p>
-                </div>
 
-                {!p.isInstalled && (
-                  <button
-                    onClick={() => onInstall(p, p.installedFilename)}
-                    className={cn(
-                      "flex items-center space-x-3 px-6 py-4 rounded-xl font-bold transition-all shadow-xl",
-                      p.isUpdate ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-ps-blue hover:bg-ps-blue/80 text-white"
-                    )}
-                  >
-                    <CloudDownload className="w-6 h-6" />
-                    <span>{p.isUpdate ? "Update" : "Install"}</span>
-                  </button>
-                )}
-              </div>
-            ))}
+                  {!p.isInstalled && (
+                    <button
+                      onClick={() => onInstall(p, p.installedFilename)}
+                      className={cn(
+                        "flex items-center space-x-3 px-6 py-4 rounded-xl font-bold transition-all shadow-xl",
+                        p.isUpdate ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-ps-blue hover:bg-ps-blue/80 text-white"
+                      )}
+                    >
+                      <CloudDownload className="w-6 h-6" />
+                      <span>{p.isUpdate ? "Update" : "Install"}</span>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -492,8 +541,6 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
       </div>
     )
   }
-
-
 
   return (
     <div className="space-y-12 animate-fade-in">
@@ -557,11 +604,12 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
 }
 
 const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
-  const [subView, setSubView] = useState('list') // 'list' or 'add'
+  const [subView, setSubView] = useState('list')
   const [enabled, setEnabled] = useState(false)
   const [autoloadList, setAutoloadList] = useState([])
   const [showDelayModal, setShowDelayModal] = useState(false)
   const [customDelay, setCustomDelay] = useState('')
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (config) {
@@ -578,6 +626,25 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
     onSaveConfig({ AUTOLOAD_ENABLED: val, AUTOLOAD_LIST: autoloadList.join(',') })
   }
 
+  const addPayload = (p) => {
+    const isKstuff = p.toLowerCase().includes('kstuff');
+    if (isKstuff) {
+      const existing = autoloadList.find(x => x.toLowerCase().includes('kstuff'));
+      if (existing) {
+        onToast(`Conflict: Multiple KStuff payloads detected.`, 'error');
+        return;
+      }
+    }
+    setAutoloadList([...autoloadList, p]);
+    setSubView('list')
+  }
+
+  const addDelay = (ms) => {
+    setAutoloadList([...autoloadList, `!${ms}`])
+    setShowDelayModal(false)
+    setSubView('list')
+  }
+
   const moveUp = (index) => {
     if (index === 0) return
     const newList = [...autoloadList]
@@ -592,33 +659,15 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
     setAutoloadList(newList)
   }
 
-  const hasEtaHen = autoloadList.some(p => p.toLowerCase().includes('etahen'))
-  const hasKstuff = autoloadList.some(p => p.toLowerCase().includes('kstuff'))
-
-  const handleSave = () => {
+  const handleSave = async () => {
     const shouldEnable = autoloadList.length > 0 && enabled
     if (autoloadList.length === 0) setEnabled(false)
     const finalList = autoloadList.map(p => p === 'DELAY' ? '!1000' : p)
-    onSaveConfig({ AUTOLOAD_ENABLED: shouldEnable, AUTOLOAD_LIST: finalList.join(',') })
-  }
-
-  const addDelay = (ms) => {
-    setAutoloadList([...autoloadList, `!${ms}`])
-    setShowDelayModal(false)
-    setSubView('list')
-  }
-
-  const addPayload = (p) => {
-    const isKstuff = p.toLowerCase().includes('kstuff');
-    if (isKstuff) {
-      const existing = autoloadList.find(x => x.toLowerCase().includes('kstuff'));
-      if (existing) {
-        onToast(`Conflict: Multiple KStuff payloads detected.`, 'error');
-        return;
-      }
+    const success = await onSaveConfig({ AUTOLOAD_ENABLED: shouldEnable, AUTOLOAD_LIST: finalList.join(',') })
+    if (success) {
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
     }
-    setAutoloadList([...autoloadList, p]);
-    setSubView('list')
   }
 
   const renderAvailable = () => (
@@ -653,7 +702,7 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
               onClick={() => !isBlocked && addPayload(p)}
               disabled={isBlocked}
               className={cn(
-                "flex items-center justify-between p-6 glass-card rounded-2xl border-white/20 transition-all",
+                "flex items-center justify-between p-6 glass-card rounded-2xl border-white/20 transition-all text-left",
                 isBlocked ? "opacity-40 cursor-not-allowed" : "bg-white/[0.03] hover:border-ps-blue group"
               )}
             >
@@ -694,13 +743,6 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
       </div>
 
       <div className="glass-panel p-6 rounded-ps-3xl border-white/10 flex-1 overflow-hidden flex flex-col min-h-[400px]">
-        {hasEtaHen && hasKstuff && (
-          <div className="p-4 bg-amber-500/10 border border-amber-500/50 rounded-2xl flex items-center space-x-4 text-amber-500 mb-2">
-            <AlertTriangle className="w-6 h-6" />
-            <span className="font-bold uppercase tracking-tight text-xs leading-tight">Warning: etaHEN and KStuff conflict detected.</span>
-          </div>
-        )}
-
         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2 mb-6">
           {autoloadList.map((p, i) => (
             <div key={`${p}-${i}`} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10 animate-in slide-in-from-left duration-200">
@@ -729,8 +771,15 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
           )}
         </div>
 
-        <button onClick={handleSave} className="w-full py-5 bg-ps-blue hover:bg-ps-blue/80 text-white rounded-2xl font-black uppercase italic tracking-tighter text-xl transition-all shadow-2xl">
-          Save Sequence
+        <button 
+          onClick={handleSave} 
+          className={cn(
+            "w-full py-5 rounded-2xl font-black uppercase italic tracking-tighter text-xl transition-all shadow-2xl flex items-center justify-center space-x-3",
+            saved ? "bg-emerald-600 text-white" : "bg-ps-blue hover:bg-ps-blue/80 text-white"
+          )}
+        >
+          {saved ? <CheckCircle2 className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
+          <span>{saved ? "Configuration Saved" : "Save Sequence"}</span>
         </button>
       </div>
     </div>
@@ -738,21 +787,24 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
 
   if (!enabled) {
     return (
-      <div className="flex flex-col items-center justify-center space-y-8 md:space-y-12 py-10 md:py-20 animate-fade-in text-center max-w-4xl mx-auto">
-        <div className="p-8 md:p-12 bg-ps-blue/10 rounded-[2.5rem] md:rounded-[3.5rem] border border-ps-blue/20">
-          <RefreshCw className="w-16 h-16 md:w-24 md:h-24 text-ps-blue" />
+      <div className="flex-1 flex flex-col items-center justify-center space-y-8 animate-fade-in text-center p-6 md:p-12">
+        <div className="relative h-24 w-24 md:h-32 md:w-32 mx-auto">
+          <div className="absolute inset-0 bg-ps-blue/20 blur-3xl rounded-full animate-pulse" />
+          <div className="relative flex items-center justify-center h-full w-full bg-black/40 border border-white/10 rounded-3xl md:rounded-[2.5rem] shadow-2xl">
+            <RefreshCw className="w-10 h-10 md:w-16 md:h-16 text-ps-blue" />
+          </div>
         </div>
-        <div className="space-y-4 md:space-y-6 px-4">
-          <h2 className="text-4xl md:text-6xl font-black text-white uppercase italic tracking-tighter">
+        <div className="space-y-3 md:space-y-4 px-4 max-w-2xl">
+          <h2 className="text-3xl md:text-5xl font-black text-white uppercase italic tracking-tighter">
             Autoload <span className="text-ps-blue">Sequence</span>
           </h2>
-          <p className="text-lg md:text-2xl text-zinc-400 font-medium leading-relaxed italic">
+          <p className="text-md md:text-xl text-zinc-400 font-medium leading-relaxed">
             Chain multiple payloads to be executed automatically every time Next Menu starts.
           </p>
         </div>
         <button
           onClick={() => handleToggle(true)}
-          className="px-10 md:px-16 py-6 md:py-8 bg-ps-blue text-white text-xl md:text-3xl font-black uppercase rounded-2xl md:rounded-[2rem] hover:bg-ps-blue/80 transition-all transform active:scale-95 shadow-[0_0_50px_rgba(0,149,255,0.4)]"
+          className="px-8 md:px-12 py-5 md:py-6 bg-ps-blue text-white text-lg md:text-2xl font-black uppercase rounded-2xl md:rounded-[1.5rem] hover:bg-ps-blue/80 transition-all transform active:scale-95 shadow-[0_0_40px_rgba(0,149,255,0.3)]"
         >
           Enable Autoload
         </button>
@@ -762,13 +814,10 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
 
   return (
     <div className="h-[calc(100vh-250px)] md:h-auto overflow-hidden md:overflow-visible animate-fade-in">
-      {/* Desktop view: Side by Side */}
       <div className="hidden md:grid grid-cols-2 gap-12 items-start h-full">
         {renderAvailable()}
         {renderSequence()}
       </div>
-
-      {/* Mobile view: Sequential/View-based */}
       <div className="md:hidden h-full flex flex-col">
         {subView === 'list' ? renderSequence() : renderAvailable()}
       </div>
@@ -816,7 +865,6 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
                 Add
               </button>
             </div>
-            <p className="text-sm text-zinc-500 italic">1000ms = 1s. Chain order matters.</p>
           </div>
         </div>
       </Modal>
@@ -828,8 +876,6 @@ const LogViewer = ({ logs }) => {
   const scrollRef = useRef(null)
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [hasNewLogs, setHasNewLogs] = useState(false)
-
-  const isFirstLoad = useRef(true)
 
   const handleScroll = () => {
     if (!scrollRef.current) return
@@ -845,53 +891,45 @@ const LogViewer = ({ logs }) => {
     } else {
       setHasNewLogs(true)
     }
-  }, [logs])
+  }, [logs, isAtBottom])
 
   const scrollToBottom = () => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' })
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
     setIsAtBottom(true)
     setHasNewLogs(false)
   }
 
   return (
-    <div className="space-y-6 flex-1 min-h-0 flex flex-col animate-slide-up [animation-delay:200ms]">
-      <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter flex items-center space-x-3">
-        <Terminal className="w-7 h-7 text-ps-blue" />
-        <span>Logs</span>
-      </h2>
-      <div className="glass-panel flex-1 overflow-hidden flex flex-col rounded-ps-3xl border-white/10 shadow-2xl relative">
-        <div className="absolute top-0 inset-x-0 h-10 bg-gradient-to-b from-black/80 to-transparent z-10" />
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-auto p-8 font-mono text-sm space-y-2 custom-scrollbar"
-        >
-          {logs.map((log, i) => (
-            <div key={i} className="flex space-x-4 group">
-              <span className="text-zinc-600 select-none font-bold shrink-0">{i + 1}</span>
-              <span className="text-ps-blue/80 font-bold opacity-60">»</span>
-              <span className="text-zinc-300 break-all leading-relaxed group-hover:text-white transition-colors">{log}</span>
-            </div>
-          ))}
-        </div>
-        <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
-
-        {(!isAtBottom && hasNewLogs) && (
-          <button
-            onClick={scrollToBottom}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-ps-blue text-white rounded-full font-bold uppercase tracking-widest text-[10px] z-20 flex items-center space-x-2 border border-white/20 shadow-xl"
-          >
-            <ChevronDown className="w-4 h-4" />
-            <span>New Logs Below</span>
-          </button>
-        )}
+    <div className="flex-1 min-h-0 flex flex-col relative group h-full">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 font-mono text-sm space-y-1 custom-scrollbar scroll-smooth"
+      >
+        {logs.map((log, i) => (
+          <div key={i} className="flex space-x-3 opacity-90 border-l-2 border-transparent hover:border-ps-blue hover:bg-white/5 px-2 transition-all">
+            <span className="text-zinc-600 select-none font-bold shrink-0 w-8">{i + 1}</span>
+            <span className="text-ps-blue/60 font-bold">»</span>
+            <span className="text-zinc-300 break-all leading-relaxed">{log}</span>
+          </div>
+        ))}
       </div>
+
+      {!isAtBottom && hasNewLogs && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-ps-blue text-white rounded-full font-bold uppercase tracking-widest text-[10px] z-50 flex items-center space-x-2 border border-white/20 shadow-2xl animate-bounce"
+        >
+          <ChevronDown className="w-4 h-4" />
+          <span>New Activity Below</span>
+        </button>
+      )}
     </div>
   )
 }
 
 const DonateView = () => {
-  const donateUrl = 'https://github.com/itsPLK/ps5_next_menu/DONATE.md';
+  const donateUrl = 'https://github.com/itsPLK/ps5_next_menu/blob/main/DONATE.md';
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 md:space-y-12 animate-fade-in max-w-4xl mx-auto py-10 md:py-20">
       <div className="p-8 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] bg-red-600/10 border border-red-600/20 text-red-500 shadow-2xl">
@@ -922,32 +960,93 @@ const DonateView = () => {
   )
 }
 
-const SettingsView = ({ ip, version }) => (
-  <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-12 animate-fade-in">
-    <div className="p-12 rounded-[3.5rem] bg-zinc-900 border border-white/20 text-ps-blue shadow-2xl">
-      <CheckCircle2 className="w-24 h-24" />
-    </div>
-    <div className="space-y-4">
-      <h3 className="text-6xl font-black text-white uppercase italic tracking-tighter">Next <span className="text-ps-blue">Menu</span></h3>
-      <p className="text-xl text-zinc-400 font-medium max-w-xl mx-auto italic">
-        Unified payload deployment system for modern PlayStation 5 environments.
-      </p>
-    </div>
-    <div className="grid grid-cols-2 gap-6 w-full max-w-xl">
-      <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
-        <p className="label-caps !text-[11px] mb-2">Version</p>
-        <p className="text-2xl font-black text-white">{version}</p>
+const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs }) => {
+  const [showLogs, setShowLogs] = useState(false)
+
+  useEffect(() => {
+    if (!showLogs) return
+    const eventSource = new EventSource('/events')
+    eventSource.onmessage = (e) => {
+      setLogs(prev => [...prev, e.data].slice(-100))
+    }
+    return () => eventSource.close()
+  }, [showLogs])
+
+  return (
+    <div className="space-y-12 animate-fade-in pb-20">
+      <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
+        System <span className="text-ps-blue">Information</span>
+      </h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="glass-card p-10 rounded-ps-2xl space-y-6 border-white/10">
+          <h3 className="label-caps !text-white !opacity-100 flex items-center space-x-3">
+            <Info className="w-6 h-6 text-ps-blue" />
+            <span>Environment</span>
+          </h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center py-3 border-b border-white/5">
+              <span className="text-zinc-500 font-bold uppercase text-xs">Platform</span>
+              <span className="text-white font-mono">{isPS5 ? "PlayStation 5" : "Desktop/Mobile"}</span>
+            </div>
+            <div className="flex justify-between items-center py-3 border-b border-white/5">
+              <span className="text-zinc-500 font-bold uppercase text-xs">Connection</span>
+              <span className="text-ps-blue font-mono">{window.location.hostname}</span>
+            </div>
+            <div className="flex justify-between items-center py-3">
+              <span className="text-zinc-500 font-bold uppercase text-xs">User Agent</span>
+              <span className="text-[10px] text-zinc-400 font-mono truncate max-w-[200px]">{navigator.userAgent}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-card p-10 rounded-ps-2xl space-y-8 border-white/10">
+          <h3 className="label-caps !text-white !opacity-100 flex items-center space-x-3">
+            <Terminal className="w-6 h-6 text-ps-blue" />
+            <span>Diagnostics</span>
+          </h3>
+          <button
+            onClick={() => setShowLogs(!showLogs)}
+            className={cn(
+              "w-full py-6 rounded-2xl font-black uppercase italic tracking-tighter text-xl transition-all shadow-xl",
+              showLogs ? "bg-ps-blue text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
+            )}
+          >
+            {showLogs ? "Hide Logs" : "Show Logs"}
+          </button>
+          <p className="text-sm text-zinc-500 leading-relaxed">
+            View real-time output from the Next Menu background service for debugging and status tracking.
+          </p>
+        </div>
       </div>
-      <div className="p-6 bg-white/5 border border-white/10 rounded-3xl">
-        <p className="label-caps !text-[11px] mb-2">Endpoint</p>
-        <p className="text-2xl font-mono font-black text-ps-blue">{ip}</p>
-      </div>
+
+      {showLogs && (
+        <div className="fixed inset-0 z-[2000] bg-black flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="p-6 border-b border-white/10 flex items-center justify-between bg-black/80 backdrop-blur-md">
+            <h3 className="label-caps !text-white !opacity-100 flex items-center space-x-3">
+              <Terminal className="w-6 h-6 text-ps-blue" />
+              <span>Next Menu Logs</span>
+            </h3>
+            <button
+              onClick={() => setShowLogs(false)}
+              className="p-3 rounded-xl bg-white/5 hover:bg-red-500 hover:text-white transition-all border border-white/10"
+            >
+              <X className="w-8 h-8" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <LogViewer logs={logs} />
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-)
+  )
+}
 
 function App() {
   const [view, setView] = useState('dashboard')
+  const [sidebarExpanded, setSidebarExpanded] = useState(true)
+  const [showMobileLogs, setShowMobileLogs] = useState(false)
   const [autoloadStatus, setAutoloadStatus] = useState(null)
   const [logs, setLogs] = useState([])
   const [payloads, setPayloads] = useState([])
@@ -960,8 +1059,6 @@ function App() {
   const [loadingPayloads, setLoadingPayloads] = useState(true)
   const [downloadModal, setDownloadModal] = useState({ show: false, name: '', progress: 0 })
   const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null })
-
-  const logEndRef = useRef(null)
 
   const addToast = (message, type = 'success') => {
     const id = Date.now()
@@ -991,7 +1088,6 @@ function App() {
       setPayloads(data.payloads)
       setLoadingPayloads(false)
     } else if (retryCount < 5) {
-      /* Retry if server might not be ready yet */
       setTimeout(() => refreshPayloads(retryCount + 1), 1000)
     } else {
       setLoadingPayloads(false)
@@ -1029,7 +1125,7 @@ function App() {
     }, 1500)
   }
 
-  const deletePayload = (fileName) => {
+  const handleDelete = (fileName) => {
     setConfirmModal({
       show: true,
       title: "Delete Payload",
@@ -1043,7 +1139,7 @@ function App() {
     })
   }
 
-  const handleFileUpload = async (e) => {
+  const handleUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
     setDownloadModal({ show: true, name: file.name, progress: 20 })
@@ -1060,7 +1156,7 @@ function App() {
     setTimeout(() => setDownloadModal({ show: false }), 800)
   }
 
-  const handleRemoteInstall = async (p, oldFilename = null) => {
+  const handleInstall = async (p, oldFilename = null) => {
     setDownloadModal({ show: true, name: p.filename, progress: 10 })
     try {
       const resp = await fetch(p.url)
@@ -1092,9 +1188,12 @@ function App() {
       body: JSON.stringify(merged)
     })
     if (success) {
-      addToast("Configuration saved")
       refreshConfig()
-    } else addToast("Save failed", "error")
+      return true
+    } else {
+      addToast("Save failed", "error")
+      return false
+    }
   }
 
   useEffect(() => {
@@ -1107,40 +1206,33 @@ function App() {
       refreshConfig()
     }
     init()
-
-    let statusTimeout;
-    const pollStatus = async () => {
-      const status = await api('/autoload_status');
-      if (status) {
-        setAutoloadStatus(status);
-      }
-      // Speed up polling significantly during countdown or execution for better sync
-      const isCountdown = status && status.remaining > 0;
-      const isExecuting = status && (status.remaining === 0 || status.current === 'DONE');
-
-      let nextDelay = 3000; // Default idle
-      if (isCountdown) nextDelay = 250; // High precision for countdown
-      else if (isExecuting) nextDelay = 1000; // Standard for execution
-
-      statusTimeout = setTimeout(pollStatus, nextDelay);
-    };
-    pollStatus();
-
-    const eventSource = new EventSource('/events')
-    eventSource.onmessage = (e) => {
-      setLogs(prev => [...prev, e.data].slice(-100))
+  }, [])
+  useEffect(() => {
+    let statusTimeout
+    const poll = async () => {
+      try {
+        const res = await fetch('/autoload_status')
+        if (res.ok) {
+          const data = await res.json()
+          setAutoloadStatus(data)
+          
+          // Poll as long as countdown is active OR sequence is executing (not yet DONE)
+          const isActive = data && (data.remaining >= 0 && data.current !== 'DONE')
+          if (isActive) {
+            // Poll faster during active execution
+            const delay = (data.remaining > 0) ? 1000 : 500
+            statusTimeout = setTimeout(poll, delay)
+          }
+        }
+      } catch (e) { }
     }
-
-    return () => {
-      clearTimeout(statusTimeout)
-      eventSource.close()
-    }
+    poll()
+    return () => clearTimeout(statusTimeout)
   }, [])
 
-  useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'auto' }) }, [logs])
 
   return (
-    <div className="min-h-screen ps5-bg text-zinc-100 font-ps5 overflow-hidden flex flex-col">
+    <div className="min-h-screen ps5-bg text-zinc-100 font-ps5 flex flex-col md:flex-row md:overflow-hidden">
       {/* Toast Container */}
       <div className="fixed top-0 right-0 p-8 z-[2000] space-y-4 pointer-events-none">
         {toasts.map(t => (
@@ -1179,95 +1271,117 @@ function App() {
         <AutoloadOverlay status={autoloadStatus} onCancel={handleAbort} onFinish={handleFinish} />
       )}
 
-      {/* Main Layout */}
-      <div className="flex-1 overflow-auto custom-scrollbar relative pb-20 md:pb-0">
-        <nav className="sticky top-0 z-[100] bg-black/40 backdrop-blur-xl border-b border-white/5 px-6 md:px-12 py-3 md:py-6 flex items-center justify-between shadow-2xl max-md:fixed max-md:bottom-0 max-md:top-auto max-md:border-t max-md:border-b-0 max-md:w-full">
-          <div className="flex items-center space-x-4 md:space-x-10">
-            <div className="flex items-center space-x-2 md:space-x-4">
-              <div className="p-2 md:p-3 bg-ps-blue rounded-xl md:rounded-2xl shadow-[0_0_30px_rgba(0,112,209,0.4)]">
-                <Cpu className="w-5 h-5 md:w-8 md:h-8 text-white" />
+      {/* DESKTOP SIDEBAR */}
+      <aside className={cn(
+        "hidden md:flex flex-col bg-black/40 backdrop-blur-3xl border-r border-white/5 transition-all duration-500 z-[100] h-screen shadow-[10px_0_30px_rgba(0,0,0,0.5)]",
+        sidebarExpanded ? "w-80" : "w-24"
+      )}>
+        <div className="p-6 flex flex-col h-full">
+          <div className="flex items-center mb-12 h-10">
+            <button
+              onClick={() => setSidebarExpanded(!sidebarExpanded)}
+              className="p-3 bg-white/5 hover:bg-ps-blue hover:text-white rounded-xl transition-all mr-4 shrink-0"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <div className={cn("flex items-center space-x-3 transition-all duration-500", sidebarExpanded ? "opacity-100 scale-100" : "opacity-0 scale-90 absolute pointer-events-none")}>
+              <div className="p-2 bg-ps-blue rounded-xl shadow-[0_0_20px_rgba(0,112,209,0.3)]">
+                <Cpu className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl md:text-3xl font-black italic uppercase tracking-tighter text-white">Next <span className="text-ps-blue max-md:hidden">Menu</span></span>
-            </div>
-            <div className="flex items-center space-x-1 md:space-x-4">
-              <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={LayoutDashboard} label="Dashboard" mobileLabel="HOME" />
-              <NavButton active={view === 'storage'} onClick={() => setView('storage')} icon={Database} label="Manage Payloads" mobileLabel="MANAGE" />
-              <NavButton active={view === 'autoload'} onClick={() => setView('autoload')} icon={RefreshCw} label="Autoload" mobileLabel="AUTO" />
-              <NavButton active={view === 'settings'} onClick={() => setView('settings')} icon={Info} label="Info" mobileLabel="INFO" />
-              <div className="w-px h-8 bg-white/10 mx-2 hidden md:block" />
-              <NavButton
-                active={view === 'donate'}
-                onClick={() => setView('donate')}
-                icon={Heart}
-                label="Donate"
-                mobileLabel="DONATE"
-                className={view === 'donate' ? "bg-red-600 border-red-600 shadow-[0_0_20px_rgba(220,38,38,0.3)]" : "text-red-500/60 hover:text-red-500 hover:bg-red-500/5"}
-              />
+              <span className="text-2xl font-black italic uppercase tracking-tighter text-white">Next<span className="text-ps-blue">Menu</span></span>
             </div>
           </div>
-          <div className="hidden md:flex items-center space-x-6">
-            {/* IP info removed as requested */}
-          </div>
-        </nav>
 
-        <main className="p-6 md:p-16 max-w-[1800px] mx-auto">
+          <nav className="flex-1 space-y-2">
+            <NavButton sidebar sidebarExpanded={sidebarExpanded} active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={LayoutDashboard} label="Dashboard" />
+            <NavButton sidebar sidebarExpanded={sidebarExpanded} active={view === 'storage'} onClick={() => setView('storage')} icon={Database} label="Manage Payloads" />
+            <NavButton sidebar sidebarExpanded={sidebarExpanded} active={view === 'autoload'} onClick={() => setView('autoload')} icon={RefreshCw} label="Autoload" />
+            <NavButton sidebar sidebarExpanded={sidebarExpanded} active={view === 'settings'} onClick={() => setView('settings')} icon={Info} label="Info" />
+          </nav>
+
+          <div className="pt-6 border-t border-white/5">
+            <NavButton
+              sidebar
+              sidebarExpanded={sidebarExpanded}
+              active={view === 'donate'}
+              onClick={() => setView('donate')}
+              icon={Heart}
+              label="Donate"
+              className={view === 'donate' ? "bg-red-600 shadow-[0_0_20px_rgba(220,38,38,0.3)]" : "text-red-500 hover:bg-red-600/10"}
+            />
+          </div>
+        </div>
+      </aside>
+
+      {/* MOBILE BOTTOM NAV */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-[100] bg-black/80 backdrop-blur-2xl border-t border-white/5 h-20 flex items-center shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+        <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={LayoutDashboard} label="Dashboard" mobileLabel="HOME" />
+        <NavButton showSeparator active={view === 'storage'} onClick={() => setView('storage')} icon={Database} label="Manage Payloads" mobileLabel="MANAGE" />
+        <NavButton showSeparator active={view === 'autoload'} onClick={() => setView('autoload')} icon={RefreshCw} label="Autoload" mobileLabel="AUTO" />
+        <NavButton showSeparator active={view === 'settings'} onClick={() => setView('settings')} icon={Info} label="Info" mobileLabel="INFO" />
+        <NavButton
+          showSeparator
+          active={view === 'donate'}
+          onClick={() => setView('donate')}
+          icon={Heart}
+          label="Donate"
+          mobileLabel="DONATE"
+        />
+      </nav>
+
+      {/* MAIN CONTENT AREA */}
+      <div className="flex flex-col md:h-screen md:flex-1 relative md:min-h-0">
+        <main className="md:flex-1 md:overflow-y-auto custom-scrollbar p-6 md:p-16 pb-24 md:pb-16 max-w-[1800px] mx-auto w-full flex flex-col">
           {view === 'dashboard' && (
-            <div className="h-[calc(100vh-160px)] md:h-[calc(100vh-220px)] flex flex-col space-y-8 md:space-y-12">
-              {/* Payloads section - Flex 2 */}
-              <div className="flex-[2] space-y-4 md:space-y-8 animate-slide-up [animation-delay:100ms] flex flex-col min-h-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto custom-scrollbar px-4 py-4">
-                  {loadingPayloads ? (
-                    Array.from({ length: 4 }).map((_, i) => (
-                      <div key={i} className="glass-card p-6 rounded-ps-xl flex items-center space-x-4 border-white/5 animate-pulse">
-                        <div className="w-12 h-12 bg-white/5 rounded-xl" />
-                        <div className="h-6 w-32 bg-white/5 rounded" />
-                      </div>
-                    ))
-                  ) : payloads.length === 0 ? (
-                    <div className="col-span-full py-12 px-8 border-2 border-dashed border-white/5 rounded-ps-xl flex flex-col items-center justify-center space-y-4 bg-white/[0.01]">
-                      <Package className="w-12 h-12 text-white/10" />
-                      <p className="text-zinc-500 font-bold uppercase tracking-tight text-lg">No Payloads Found</p>
-                      <button onClick={() => setView('storage')} className="btn-primary py-3 px-8 text-sm">Add from Hub</button>
+            <div className="space-y-8 md:space-y-12">
+              <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
+                Launch <span className="text-ps-blue">Payload</span>
+              </h2>
+              <div className={cn(
+                "grid gap-4 md:gap-6",
+                isPS5 ? "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              )}>
+                {loadingPayloads ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="glass-card p-6 rounded-ps-xl flex items-center space-x-4 border-white/5 animate-pulse">
+                      <div className="w-12 h-12 bg-white/5 rounded-xl" />
+                      <div className="h-6 w-32 bg-white/5 rounded" />
                     </div>
-                  ) : (
-                    payloads.map((p, i) => (
-                      <PayloadButton
-                        key={i}
-                        path={p}
-                        onClick={() => loadPayload(p)}
-                        isLoading={loading && activeLoadingName === p.split('/').pop().replace(/\.(elf|bin|lua)$/i, '').replace(/_/g, ' ')}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Logs section - Flex 1 */}
-              <div className="flex-1 flex flex-col min-h-0">
-                <LogViewer logs={logs} />
+                  ))
+                ) : payloads.length === 0 ? (
+                  <div className="col-span-full py-20 border-2 border-dashed border-white/5 rounded-ps-xl flex flex-col items-center justify-center space-y-6 bg-white/[0.01]">
+                    <Package className="w-16 h-16 text-white/10" />
+                    <div className="text-center">
+                      <p className="text-white font-black uppercase italic tracking-tighter text-2xl">Empty Library</p>
+                      <p className="text-zinc-500 font-medium">Add payloads from the Cloud Hub to get started.</p>
+                    </div>
+                    <button onClick={() => setView('storage')} className="px-8 py-3 bg-ps-blue text-white rounded-xl font-bold uppercase tracking-tight shadow-xl shadow-ps-blue/20">Open Repository</button>
+                  </div>
+                ) : (
+                  payloads.map((p, i) => (
+                    <PayloadButton
+                      key={i}
+                      path={p}
+                      onClick={() => loadPayload(p)}
+                      isLoading={loading && activeLoadingName === p.split('/').pop().replace(/\.(elf|bin|lua)$/i, '').replace(/_/g, ' ')}
+                    />
+                  ))
+                )}
               </div>
             </div>
           )}
 
           {view === 'storage' && (
-            <StorageHub
-              payloads={payloads}
-              onInstall={handleRemoteInstall}
-              onDelete={deletePayload}
-              onUpload={handleFileUpload}
-            />
+            <StorageHub payloads={payloads} onInstall={handleInstall} onDelete={handleDelete} onUpload={handleUpload} />
           )}
 
           {view === 'autoload' && (
-            <AutoloadView
-              payloads={payloads}
-              config={config}
-              onSaveConfig={handleSaveConfig}
-              onToast={addToast}
-            />
+            <AutoloadView payloads={payloads} config={config} onSaveConfig={handleSaveConfig} onToast={addToast} />
           )}
 
-          {view === 'settings' && <SettingsView ip={ip} version={version} />}
+          {view === 'settings' && (
+            <SettingsView config={config} onSaveConfig={handleSaveConfig} isPS5={isPS5} logs={logs} setLogs={setLogs} />
+          )}
           {view === 'donate' && <DonateView />}
         </main>
       </div>
