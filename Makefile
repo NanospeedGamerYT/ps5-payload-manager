@@ -8,7 +8,7 @@ CC     := /opt/ps5-payload-sdk/bin/prospero-clang
 SDK      := /opt/ps5-payload-sdk
 TARGET   := $(SDK)/target
 INCLUDES := -Iinclude -I$(TARGET)/include
-LIBS     := -L$(TARGET)/lib -lmicrohttpd -lpthread -lSceNetCtl -lSceUserService
+LIBS     := -L$(TARGET)/lib -lmicrohttpd -lpthread -lSceNetCtl -lSceUserService -lSceSystemService
 
 # Source Files
 SRCS := src/main.c src/payload_mgr.c src/ps5_launcher.c src/notification.c src/utils.c src/autoload.c
@@ -29,6 +29,12 @@ all: $(ELF)
 frontend-build:
 	@echo "Building frontend..."
 	cd frontend && npm install && npm run build
+	@VERSION=$$(grep '#define MENU_VERSION' include/next_menu.h | awk '{print $$3}' | tr -d '"'); \
+	COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown"); \
+	DATE=$$(date -u +"%Y-%m-%d %H:%M UTC"); \
+	TITLE="Next Menu v$$VERSION ($$COMMIT, built at $$DATE)"; \
+	echo "Updating title in index.html to: $$TITLE"; \
+	sed -i '' "s/\[\[TITLE_PLACEHOLDER\]\]/$$TITLE/g" frontend/dist/index.html
 
 $(ASSET_HEADER): $(FRONTEND_DIST)
 	@echo "Generating asset header..."

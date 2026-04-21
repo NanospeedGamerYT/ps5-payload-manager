@@ -26,7 +26,7 @@
 #define ROUTE_REPO_PUSH "/repository_push"
 #define ROUTE_REPO_INSTALL_PUSH "/repository_install_push"
 
-#define MENU_VERSION "1.0.2-native"
+#define MENU_VERSION "1.0.0"
 #define AUTOLOAD_CONFIG_PATH "/data/next_menu/autoload.txt"
 #define NEXT_CONFIG_PATH "/data/next_menu/next_config.txt"
 #define REPOSITORY_CACHE_PATH "/data/next_menu/repository_cache.json"

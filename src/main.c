@@ -157,12 +157,14 @@ struct UploadStatus {
     char temp_path[512];
 };
 
-static void read_next_config_values(int *enabled, long *repo_update) {
+static void read_next_config_values(int *enabled, long *repo_update, int *browser_open, int *auto_delay) {
     FILE *f = fopen(NEXT_CONFIG_PATH, "r");
     char line[256];
 
     *enabled = 0;
     *repo_update = 0;
+    *browser_open = 1; /* Default on */
+    *auto_delay = 5;   /* Default 5s */
 
     if (!f) {
         return;
@@ -173,12 +175,16 @@ static void read_next_config_values(int *enabled, long *repo_update) {
             *enabled = atoi(line + 17);
         } else if (strncmp(line, "LAST_REPOSITORY_UPDATE=", 23) == 0) {
             *repo_update = atol(line + 23);
+        } else if (strncmp(line, "AUTO_BROWSER_OPEN=", 18) == 0) {
+            *browser_open = atoi(line + 18);
+        } else if (strncmp(line, "AUTOLOAD_DELAY=", 15) == 0) {
+            *auto_delay = atoi(line + 15);
         }
     }
     fclose(f);
 }
 
-static int write_next_config_values(int enabled, long repo_update) {
+static int write_next_config_values(int enabled, long repo_update, int browser_open, int auto_delay) {
     FILE *f;
 
     mkdir(BASE_DATA_DIR, 0777);
@@ -189,6 +195,8 @@ static int write_next_config_values(int enabled, long repo_update) {
 
     fprintf(f, "AUTOLOAD_ENABLED=%d\n", enabled ? 1 : 0);
     fprintf(f, "LAST_REPOSITORY_UPDATE=%ld\n", repo_update);
+    fprintf(f, "AUTO_BROWSER_OPEN=%d\n", browser_open ? 1 : 0);
+    fprintf(f, "AUTOLOAD_DELAY=%d\n", auto_delay);
     fclose(f);
     return 0;
 }
@@ -331,10 +339,33 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
                 }
 
                 if (enabled != -1) {
-                    int existing_enabled = 0;
-                    long last_repo_update = 0;
-                    read_next_config_values(&existing_enabled, &last_repo_update);
-                    if (write_next_config_values(enabled, last_repo_update) == 0) {
+                    int ex_en, ex_br, ex_del;
+                    long ex_repo;
+                    read_next_config_values(&ex_en, &ex_repo, &ex_br, &ex_del);
+
+                    /* Update individual fields from JSON if present */
+                    int browser_open = ex_br;
+                    char *browser_pos = strstr(status->data, "\"AUTO_BROWSER_OPEN\"");
+                    if (browser_pos) {
+                        char *val = strchr(browser_pos, ':');
+                        if (val) {
+                            val++; while (*val == ' ') val++;
+                            if (strncmp(val, "true", 4) == 0) browser_open = 1;
+                            else if (strncmp(val, "false", 5) == 0) browser_open = 0;
+                        }
+                    }
+
+                    int auto_delay = ex_del;
+                    char *delay_pos = strstr(status->data, "\"AUTOLOAD_DELAY\"");
+                    if (delay_pos) {
+                        char *val = strchr(delay_pos, ':');
+                        if (val) {
+                            val++; while (*val == ' ') val++;
+                            auto_delay = atoi(val);
+                        }
+                    }
+
+                    if (write_next_config_values(enabled, ex_repo, browser_open, auto_delay) == 0) {
                         nm_log("[NextMenu] Saved config to %s\n", NEXT_CONFIG_PATH);
                     }
                     if (enabled == 0) nm_autoload_abort();
@@ -602,9 +633,13 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
             fclose(f);
         }
 
+        int config_enabled, config_browser, config_delay;
+        long config_repo;
+        read_next_config_values(&config_enabled, &config_repo, &config_browser, &config_delay);
+
         snprintf(response_buffer, sizeof(response_buffer), 
-                "{\"remaining\":%d,\"total\":%d,\"done\":%d,\"current\":\"%s\",\"list\":\"%s\"}", 
-                remaining, total, done, current, list_buf);
+                "{\"remaining\":%d,\"total\":%d,\"done\":%d,\"current\":\"%s\",\"list\":\"%s\",\"delay\":%d}", 
+                remaining, total, done, current, list_buf, config_delay);
         resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
         MHD_add_response_header(resp, "Content-Type", "application/json");
     } else if (strcmp(url, ROUTE_AUTOLOAD_CLEAR) == 0) {
@@ -622,9 +657,9 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
         resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
         MHD_add_response_header(resp, "Content-Type", "application/json");
     } else if (strcmp(url, ROUTE_GET_CONFIG) == 0) {
-        int enabled = 0;
+        int enabled = 0, browser_open = 1, auto_delay = 5;
         long last_repo_update = 0;
-        read_next_config_values(&enabled, &last_repo_update);
+        read_next_config_values(&enabled, &last_repo_update, &browser_open, &auto_delay);
 
         /* Get list */
         char list_buf[4096] = {0};
@@ -643,8 +678,10 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
         }
 
         snprintf(response_buffer, sizeof(response_buffer),
-            "{\"AUTOLOAD_ENABLED\":%s,\"AUTOLOAD_LIST\":\"%s\",\"LAST_REPOSITORY_UPDATE\":%ld}",
-            enabled ? "true" : "false", list_buf, last_repo_update);
+            "{\"AUTOLOAD_ENABLED\":%s,\"AUTOLOAD_LIST\":\"%s\",\"LAST_REPOSITORY_UPDATE\":%ld,"
+            "\"AUTO_BROWSER_OPEN\":%s,\"AUTOLOAD_DELAY\":%d}",
+            enabled ? "true" : "false", list_buf, last_repo_update,
+            browser_open ? "true" : "false", auto_delay);
         resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
         MHD_add_response_header(resp, "Content-Type", "application/json");
     } else if (strcmp(url, "/events") == 0) {
@@ -715,16 +752,31 @@ int main(int argc, char *argv[]) {
     /* Try cache refresh (no-op if network unavailable; browser push handles updates) */
     payload_mgr_repository_ensure_fresh(0);
 
-    /* Startup Notification */
+    /* Automatically open browser to the menu URL (if enabled) */
+    int ex_en, ex_br = 1, ex_del = 5;
+    long ex_repo = 0;
+    read_next_config_values(&ex_en, &ex_repo, &ex_br, &ex_del);
+
+    /* Startup Notification - Only show if browser autostart is off */
     char current_ip[64] = "unknown";
-    if (nm_get_local_ip(current_ip, sizeof(current_ip)) == 0) {
-        nm_notify("Next Menu v%s\nIP: %s\nPort: %d", MENU_VERSION, current_ip, port);
-    } else {
-        nm_notify("Next Menu v%s\nWaiting for Network...", MENU_VERSION);
+    nm_get_local_ip(current_ip, sizeof(current_ip));
+    
+    if (!ex_br) {
+        if (strcmp(current_ip, "unknown") != 0) {
+            nm_notify("Next Menu v%s\nIP: %s\nPort: %d", MENU_VERSION, current_ip, port);
+        } else {
+            nm_notify("Next Menu v%s\nWaiting for Network...", MENU_VERSION);
+        }
     }
 
     /* Start Autoload Sequence (if config exists) */
     nm_autoload_start();
+
+    if (ex_br) {
+        char browser_url[128];
+        snprintf(browser_url, sizeof(browser_url), "http://127.0.0.1:%d", port);
+        ps5_launch_browser(browser_url);
+    }
 
     /* Watchdog and main loop */
     int network_check_timer = 0;

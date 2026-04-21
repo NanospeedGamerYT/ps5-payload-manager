@@ -30,81 +30,83 @@ void nm_autoload_get_status(int *total, int *done, char *current) {
 }
 
 void* nm_autoload_worker(void* arg) {
-    /* Wait 500ms to see if browser opens the menu automatically */
-    usleep(500000);
-
     struct stat st;
     int has_config = (stat(AUTOLOAD_CONFIG_PATH, &st) == 0);
     
     int enabled = 0;
+    int browser_open = 1;
+    int auto_delay = 5;
+
     FILE *ef = fopen(NEXT_CONFIG_PATH, "r");
     if (ef) {
         char line[128];
         while (fgets(line, sizeof(line), ef)) {
             if (strncmp(line, "AUTOLOAD_ENABLED=", 17) == 0) {
-                char *val = line + 17;
-                enabled = (atoi(val) == 1 || strncmp(val, "true", 4) == 0);
+                enabled = atoi(line + 17);
+            } else if (strncmp(line, "AUTO_BROWSER_OPEN=", 18) == 0) {
+                browser_open = atoi(line + 18);
+            } else if (strncmp(line, "AUTOLOAD_DELAY=", 15) == 0) {
+                auto_delay = atoi(line + 15);
             }
         }
         fclose(ef);
     }
 
-    if (!nm_server_is_active()) {
-        char ip[64];
-        if (nm_get_local_ip(ip, sizeof(ip)) != 0) strcpy(ip, "0.0.0.0");
-        nm_notify("Next Menu Running\nhttp://%s:%d", ip, MENU_PORT);
-        
-        if (enabled && has_config) {
-            nm_notify("Autoloading in 5s\nPress PS Button to Abort");
-        }
-    }
-
     if (!enabled || !has_config) return NULL;
 
-    int klog_fd = open("/dev/klog", O_RDONLY | O_NONBLOCK);
-    if (klog_fd >= 0) {
-        /* Flush existing log buffer so we only catch NEW button presses */
-        char flush_buf[4096];
-        while (read(klog_fd, flush_buf, sizeof(flush_buf)) > 0);
-        nm_log("[Autoload] klog buffer flushed.\n");
-    } else {
-        nm_log("[Autoload] !!! Failed to open /dev/klog for input monitoring.\n");
-    }
-
-    nm_log("[Autoload] Config found. Starting 5s countdown (Press PS Button to Abort)...\n");
-    
-    char klog_buf[2048];
-    for (int i = 5; i > 0; i--) {
-        remaining_seconds = i;
-        nm_log("[Autoload] Countdown: %ds remaining...\n", i);
+    /* Perform countdown for the specified delay in all modes */
+    if (auto_delay > 0) {
+        int klog_fd = -1;
         
-        for (int j = 0; j < 10; j++) {
-            if (abort_flag) {
-                nm_log("[Autoload] ABORTED via API.\n");
-                if (klog_fd >= 0) close(klog_fd);
-                remaining_seconds = -1;
-                return NULL;
+        /* Only fallback to on-screen notification and PS button if browser is NOT automatically opened */
+        if (!browser_open) {
+            if (!nm_server_is_active()) {
+                char ip[64];
+                if (nm_get_local_ip(ip, sizeof(ip)) != 0) strcpy(ip, "0.0.0.0");
+                nm_notify("Next Menu Running\nhttp://%s:%d", ip, MENU_PORT);
+                nm_notify("Autoloading in %ds\nPress PS Button to Abort", auto_delay);
             }
 
+            klog_fd = open("/dev/klog", O_RDONLY | O_NONBLOCK);
             if (klog_fd >= 0) {
-                ssize_t n = read(klog_fd, klog_buf, sizeof(klog_buf) - 1);
-                if (n > 0) {
-                    klog_buf[n] = 0;
-                    if (strstr(klog_buf, "onPSButtonPressed")) {
-                        nm_log("[Autoload] ABORTED via PS Button.\n");
-                        nm_notify("Autoload Aborted");
-                        abort_flag = 1;
-                        close(klog_fd);
-                        remaining_seconds = -1;
-                        return NULL;
+                /* Flush existing log buffer so we only catch NEW button presses */
+                char flush_buf[4096];
+                while (read(klog_fd, flush_buf, sizeof(flush_buf)) > 0);
+            }
+            nm_log("[Autoload] Fallback Mode: Starting %ds countdown (PS Button active)...\n", auto_delay);
+        } else {
+            nm_log("[Autoload] Browser Mode: Starting %ds countdown...\n", auto_delay);
+        }
+        
+        char klog_buf[2048];
+        for (int i = auto_delay; i > 0; i--) {
+            remaining_seconds = i;
+            for (int j = 0; j < 10; j++) {
+                if (abort_flag) {
+                    if (klog_fd >= 0) close(klog_fd);
+                    remaining_seconds = -1;
+                    return NULL;
+                }
+
+                if (klog_fd >= 0) {
+                    ssize_t n = read(klog_fd, klog_buf, sizeof(klog_buf) - 1);
+                    if (n > 0) {
+                        klog_buf[n] = 0;
+                        if (strstr(klog_buf, "onPSButtonPressed")) {
+                            nm_log("[Autoload] ABORTED via PS Button.\n");
+                            nm_notify("Autoload Aborted");
+                            abort_flag = 1;
+                            close(klog_fd);
+                            remaining_seconds = -1;
+                            return NULL;
+                        }
                     }
                 }
+                usleep(100000); /* 100ms */
             }
-            usleep(100000); /* 100ms */
         }
+        if (klog_fd >= 0) close(klog_fd);
     }
-
-    if (klog_fd >= 0) close(klog_fd);
     remaining_seconds = 0;
     
     FILE *f = fopen(AUTOLOAD_CONFIG_PATH, "r");

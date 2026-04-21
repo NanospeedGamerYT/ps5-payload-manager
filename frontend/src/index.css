@@ -122,11 +122,36 @@ h1, h2, h3, h4 {
   to { -webkit-transform: rotate(360deg); }
 }
 
-.animate-spin {
-  animation: spin 1000ms linear infinite;
-  -webkit-animation: spin 1000ms linear infinite;
-}
-
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+  -webkit-animation: spin 1s linear infinite;
+  transform-origin: center;
+  -webkit-transform-origin: center;
+  will-change: transform;
+}
+
+/* Robust PS5 Spinner - Using unique keyframe name and solid borders */
+.ps5-robust-spinner {
+  width: 6rem;
+  height: 6rem;
+  border: 8px solid rgba(255, 255, 255, 0.05);
+  border-left-color: var(--color-ps-blue);
+  border-radius: 50%;
+  animation: ps5-native-spin 1s linear infinite;
+  -webkit-animation: ps5-native-spin 1s linear infinite;
+  will-change: transform;
+}
+
+@keyframes ps5-native-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@-webkit-keyframes ps5-native-spin {
+  from { -webkit-transform: rotate(0deg); }
+  to { -webkit-transform: rotate(360deg); }
 }

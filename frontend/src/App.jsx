@@ -73,9 +73,9 @@ const PayloadName = ({ path, className, versionClassName, stacked = false }) => 
       </div>
       {version && (
         <span className={cn(
-          stacked 
-            ? "text-[11px] font-bold tracking-wider text-ps-blue mt-1 opacity-90" 
-            : "text-[10px] px-2 py-0.5 bg-ps-blue/10 text-ps-blue font-bold rounded-md border border-ps-blue/20 shrink-0", 
+          stacked
+            ? "text-[11px] font-bold tracking-wider text-ps-blue mt-1 opacity-90"
+            : "text-[10px] px-2 py-0.5 bg-ps-blue/10 text-ps-blue font-bold rounded-md border border-ps-blue/20 shrink-0",
           versionClassName)}>
           {version}
         </span>
@@ -186,7 +186,7 @@ const PayloadButton = ({ path, onClick, isLoading }) => {
   )
 }
 
-const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
+const AutoloadOverlay = ({ status, onCancel, onFinish, isPS5 }) => {
   const isCountdown = status.remaining > 0;
   const isExecuting = status.remaining === 0 && status.current !== 'DONE';
   const isDone = status.current === 'DONE';
@@ -207,11 +207,14 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
     <div className="fixed inset-0 bg-black/98 z-[9999] flex flex-col items-center justify-center p-6 md:p-12 overflow-y-auto custom-scrollbar">
       <div className={cn(
         "relative w-full max-w-[1400px] flex flex-col items-center",
-        "md:flex-row md:items-start md:justify-center md:space-x-24 md:space-y-0 space-y-12"
+        isPS5 ? "flex-row items-center justify-center space-x-24 space-y-0" : "md:flex-row md:items-start md:justify-center md:space-x-24 md:space-y-0 space-y-12"
       )}>
 
         {/* LEFT COLUMN: Status, Countdown, Success, Actions */}
-        <div className="w-full max-w-md flex flex-col items-center space-y-10 md:sticky md:top-0">
+        <div className={cn(
+          "w-full max-w-md flex flex-col items-center space-y-10",
+          !isPS5 && "md:sticky md:top-0"
+        )}>
           {/* Conflict Warning */}
           {!isDone && (payloadList.some(p => p.toLowerCase().includes('etahen')) &&
             payloadList.some(p => p.toLowerCase().includes('kstuff'))) && (
@@ -233,7 +236,7 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
                       cx="112" cy="112" r="100"
                       fill="none" stroke="currentColor" strokeWidth="8"
                       strokeDasharray="628"
-                      strokeDashoffset={628 - (628 * (status.remaining / 5))}
+                      strokeDashoffset={628 - (628 * (status.remaining / (status.delay || 5)))}
                       className="text-ps-blue transition-all duration-1000 ease-linear"
                     />
                   </svg>
@@ -273,8 +276,8 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
                   <CheckCircle2 className="w-20 h-20" />
                 </div>
                 <div className="text-center space-y-2">
-                  <h2 className="text-5xl md:text-6xl font-black text-white uppercase tracking-tighter">Sequence<br />Complete</h2>
-                  <p className="text-zinc-500 font-bold uppercase text-sm tracking-[0.2em]">All systems operational</p>
+                  <h2 className="text-5xl md:text-6xl font-black text-white uppercase tracking-tighter">Autoload<br />Done</h2>
+                  <p className="text-zinc-500 font-bold uppercase text-sm tracking-[0.2em]">All payloads loaded</p>
                 </div>
               </div>
             )}
@@ -295,7 +298,7 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
                 autoFocus
                 className="w-full py-8 bg-white/10 text-white border border-white/10 text-3xl font-black uppercase rounded-3xl hover:bg-red-600 hover:border-red-600 transition-all transform active:scale-95"
               >
-                Abort Sequence
+                Abort Autoload
               </button>
             ) : (
               <div className="h-[92px] w-full flex items-center justify-center">
@@ -309,11 +312,13 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Checklist */}
         <div className="w-full max-w-xl flex flex-col min-h-0">
           <div
             ref={listRef}
-            className="w-full space-y-4 h-[400px] md:h-[650px] overflow-y-auto custom-scrollbar p-8 bg-white/5 rounded-[2.5rem] border border-white/10 shadow-2xl scroll-smooth"
+            className={cn(
+              "w-full space-y-4 overflow-y-auto custom-scrollbar p-8 bg-white/5 rounded-[2.5rem] border border-white/10 shadow-2xl scroll-smooth",
+              isPS5 ? "h-[650px]" : "h-[400px] md:h-[650px]"
+            )}
           >
             <div className="flex items-center justify-between mb-6 px-2 sticky top-0 bg-black/80 backdrop-blur-md py-4 z-10 rounded-2xl border-b border-white/5">
               <h3 className="label-caps !text-white !opacity-100 text-sm tracking-widest flex items-center space-x-3">
@@ -365,7 +370,7 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
   )
 }
 
-const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
+const StorageHub = ({ payloads, onInstall, onDelete, onUpload, ip }) => {
   const [remotePayloads, setRemotePayloads] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -448,7 +453,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
         <h2 className="text-5xl font-extrabold text-white tracking-tight">
           Payload <span className="text-ps-blue">Management</span>
         </h2>
-        
+
         {!isPS5 && (
           <label className="inline-flex items-center space-x-4 px-10 py-5 bg-ps-blue hover:bg-ps-blue/80 text-white rounded-[1.25rem] font-bold tracking-tight text-xl cursor-pointer transition-all shadow-2xl shadow-ps-blue/20 shrink-0 transform active:scale-95">
             <Upload className="w-7 h-7" />
@@ -469,7 +474,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
             {internalPayloads.length} Files
           </span>
         </div>
-        
+
         <div className="grid grid-cols-1 gap-4">
           {internalPayloads.length === 0 ? (
             <div className="py-20 border-2 border-dashed border-white/5 rounded-ps-3xl flex flex-col items-center justify-center space-y-4 bg-white/[0.01]">
@@ -492,7 +497,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
                   </div>
                   <div className="flex items-center space-x-4">
                     {remoteMatch?.isUpdate && (
-                       <button
+                      <button
                         onClick={() => onInstall(remoteMatch)}
                         className="flex items-center space-x-3 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm transition-all shadow-xl shadow-emerald-900/20"
                       >
@@ -531,7 +536,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
             Last Sync: {new Date(lastUpdate * 1000).toLocaleString()}
           </p>
         )}
-        
+
         {loading && remotePayloads.length === 0 ? (
           <div className="py-24 glass-panel rounded-ps-3xl border-white/5 flex flex-col items-center justify-center space-y-6">
             <Loader2 className="w-16 h-16 text-ps-blue animate-spin" />
@@ -539,12 +544,12 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
           </div>
         ) : error ? (
           <div className="py-20 glass-card rounded-ps-3xl border-red-500/20 flex flex-col items-center justify-center space-y-6 bg-red-950/5">
-             <AlertTriangle className="w-16 h-16 text-red-500 opacity-50" />
-             <div className="text-center">
-               <p className="text-xl font-bold text-white uppercase tracking-tight">Repository Unavailable</p>
-               <p className="text-zinc-500 mt-1">Check your internet connection and try again.</p>
-             </div>
-             <button onClick={() => fetchRemote(true)} className="px-8 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl font-bold uppercase text-xs transition-all">Retry Connection</button>
+            <AlertTriangle className="w-16 h-16 text-red-500 opacity-50" />
+            <div className="text-center">
+              <p className="text-xl font-bold text-white uppercase tracking-tight">Repository Unavailable</p>
+              <p className="text-zinc-500 mt-1">Check your internet connection and try again.</p>
+            </div>
+            <button onClick={() => fetchRemote(true)} className="px-8 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl font-bold uppercase text-xs transition-all">Retry Connection</button>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
@@ -555,7 +560,10 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
               </div>
             ) : (
               cloudItems.map((p, i) => (
-                <div key={i} className="glass-card p-8 rounded-ps-3xl flex flex-col md:flex-row md:items-center justify-between gap-8 border-white/10 hover:border-ps-blue/20 transition-all bg-white/[0.01]">
+                <div key={i} className={cn(
+                  "glass-card p-8 rounded-ps-3xl flex justify-between gap-8 border-white/10 hover:border-ps-blue/20 transition-all bg-white/[0.01]",
+                  isPS5 ? "flex-row items-center" : "flex-col md:flex-row md:items-center"
+                )}>
                   <div className="space-y-3">
                     <div className="flex items-center space-x-4">
                       <PayloadName path={p.filename} className="text-2xl" versionClassName="text-sm px-3 py-1 bg-ps-blue/10 text-ps-blue border-ps-blue/20" />
@@ -579,17 +587,23 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
           </div>
         )}
       </section>
-      
+
       {/* Footer Info for PS5 */}
       {isPS5 && (
-        <div className="glass-card p-10 rounded-ps-3xl flex flex-col md:flex-row items-center space-y-8 md:space-y-0 md:space-x-12 border-white/10 bg-black/40 mt-16">
-          <div className="bg-white p-6 rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.1)] shrink-0">
-            <QRCodeSVG value={`http://${window.location.host}`} size={160} level="M" />
+        <div className="glass-card p-10 rounded-ps-3xl flex items-center space-x-12 border-white/10 bg-black/40 mt-16">
+          <div className="flex flex-col items-center space-y-6 shrink-0">
+            <div className="bg-white p-6 rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.1)]">
+              <QRCodeSVG value={`http://${ip}:8084`} size={160} level="M" />
+            </div>
+            <code className="text-white font-mono text-lg font-black opacity-90 italic tracking-tight uppercase">{ip}:8084</code>
           </div>
-          <div className="flex-1 space-y-4 text-center md:text-left">
-            <h4 className="label-caps text-ps-blue text-lg">Remote File Management</h4>
-            <p className="text-lg text-zinc-400 leading-relaxed italic font-medium">
-              Access this dashboard from your computer or phone to upload payloads directly. Visit <code>http://{window.location.host}</code> to get started.
+          <div className="flex-1 space-y-4">
+            <h4 className="label-caps !text-white !opacity-100 text-2xl tracking-widest flex items-center space-x-4">
+              <div className="w-2 h-8 bg-ps-blue rounded-full" />
+              <span>Remote Management</span>
+            </h4>
+            <p className="text-xl text-zinc-400 leading-relaxed italic font-medium max-w-3xl">
+              Access this dashboard from your computer or phone to manage and upload payloads directly from your local network.
             </p>
           </div>
         </div>
@@ -730,7 +744,10 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
         </h2>
         <button
           onClick={() => setSubView('add')}
-          className="md:hidden flex items-center space-x-2 px-6 py-3 bg-ps-blue text-white rounded-xl font-bold uppercase tracking-tight shadow-xl"
+          className={cn(
+            "flex items-center space-x-2 px-6 py-3 bg-ps-blue text-white rounded-xl font-bold uppercase tracking-tight shadow-xl",
+            isPS5 ? "hidden" : "md:hidden"
+          )}
         >
           <Activity className="w-5 h-5" />
           <span>Add Item</span>
@@ -766,8 +783,8 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
           )}
         </div>
 
-        <button 
-          onClick={handleSave} 
+        <button
+          onClick={handleSave}
           className={cn(
             "w-full py-5 rounded-2xl font-bold tracking-tight text-xl transition-all shadow-2xl flex items-center justify-center space-x-3",
             saved ? "bg-emerald-600 text-white" : "bg-ps-blue hover:bg-ps-blue/80 text-white"
@@ -808,12 +825,21 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
   }
 
   return (
-    <div className="h-[calc(100vh-250px)] md:h-auto overflow-hidden md:overflow-visible animate-fade-in">
-      <div className="hidden md:grid grid-cols-2 gap-12 items-start h-full">
+    <div className={cn(
+      "overflow-hidden md:overflow-visible animate-fade-in",
+      isPS5 ? "h-full" : "h-[calc(100vh-250px)] md:h-auto"
+    )}>
+      <div className={cn(
+        "gap-12 items-start h-full",
+        isPS5 ? "grid grid-cols-2" : "hidden md:grid md:grid-cols-2"
+      )}>
         {renderAvailable()}
         {renderSequence()}
       </div>
-      <div className="md:hidden h-full flex flex-col">
+      <div className={cn(
+        "h-full flex flex-col",
+        isPS5 ? "hidden" : "md:hidden"
+      )}>
         {subView === 'list' ? renderSequence() : renderAvailable()}
       </div>
 
@@ -958,6 +984,9 @@ const DonateView = () => {
 const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs }) => {
   const [showLogs, setShowLogs] = useState(false)
 
+  const autoOpen = config.AUTO_BROWSER_OPEN !== false
+  const autoloadDelay = config.AUTOLOAD_DELAY || 5
+
   useEffect(() => {
     if (!showLogs) return
     const eventSource = new EventSource('/events')
@@ -968,50 +997,90 @@ const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs }) => {
   }, [showLogs])
 
   return (
-    <div className="space-y-12 animate-fade-in pb-20">
+    <div className="space-y-12 animate-fade-in pb-32">
       <h2 className="text-4xl font-extrabold text-white tracking-tight">
-        System <span className="text-ps-blue">Information</span>
+        System <span className="text-ps-blue">Settings</span>
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="glass-card p-10 rounded-ps-2xl space-y-6 border-white/10">
+      <div className={cn(
+        "grid gap-8",
+        isPS5 ? "grid-cols-2" : "grid-cols-1 md:grid-cols-2"
+      )}>
+        {/* Startup Settings */}
+        <div className="glass-card p-10 rounded-ps-2xl space-y-8 border-white/10 flex flex-col">
           <h3 className="label-caps !text-white !opacity-100 flex items-center space-x-3">
-            <Info className="w-6 h-6 text-ps-blue" />
-            <span>Environment</span>
+            <Zap className="w-6 h-6 text-ps-blue" />
+            <span>Startup & Automation</span>
           </h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center py-3 border-b border-white/5">
-              <span className="text-zinc-500 font-bold uppercase text-xs">Platform</span>
-              <span className="text-white font-mono">{isPS5 ? "PlayStation 5" : "Desktop/Mobile"}</span>
+
+          <div className="space-y-8 flex-1">
+            <div className="flex items-center justify-between p-6 bg-white/5 rounded-2xl border border-white/10">
+              <div className="space-y-1">
+                <p className="font-bold text-white uppercase text-sm tracking-tight">Auto-open Browser</p>
+                <p className="text-xs text-zinc-500 max-w-[200px]">Launch browser to this menu on startup.</p>
+              </div>
+              <button
+                onClick={() => onSaveConfig({ AUTO_BROWSER_OPEN: !autoOpen })}
+                className={cn(
+                  "w-16 h-8 rounded-full transition-all relative overflow-hidden p-1",
+                  autoOpen ? "bg-ps-blue" : "bg-white/10"
+                )}
+              >
+                <div className={cn(
+                  "w-6 h-6 bg-white rounded-full transition-all shadow-lg",
+                  autoOpen ? "translate-x-8" : "translate-x-0"
+                )} />
+              </button>
             </div>
-            <div className="flex justify-between items-center py-3 border-b border-white/5">
-              <span className="text-zinc-500 font-bold uppercase text-xs">Connection</span>
-              <span className="text-ps-blue font-mono">{window.location.hostname}</span>
-            </div>
-            <div className="flex justify-between items-center py-3">
-              <span className="text-zinc-500 font-bold uppercase text-xs">User Agent</span>
-              <span className="text-[10px] text-zinc-400 font-mono truncate max-w-[200px]">{navigator.userAgent}</span>
+
+            <div className="space-y-6 p-6 bg-white/5 rounded-2xl border border-white/10 transition-all">
+              <div className="flex justify-between items-center">
+                <div className="space-y-1">
+                  <p className="font-bold text-white uppercase text-sm tracking-tight">Autoload Delay</p>
+                  <p className="text-xs text-zinc-500">Wait time before sequence starts.</p>
+                </div>
+                <span className="text-ps-blue font-black text-2xl">{autoloadDelay}s</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[3, 5, 10].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => onSaveConfig({ AUTOLOAD_DELAY: s })}
+                    className={cn(
+                      "py-3 rounded-xl font-bold transition-all border",
+                      autoloadDelay === s
+                        ? "bg-ps-blue border-ps-blue text-white shadow-lg shadow-ps-blue/20"
+                        : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10"
+                    )}
+                  >
+                    {s}s
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="glass-card p-10 rounded-ps-2xl space-y-8 border-white/10">
+        {/* Diagnostic Tools */}
+        <div className="glass-card p-10 rounded-ps-2xl space-y-8 border-white/10 flex flex-col">
           <h3 className="label-caps !text-white !opacity-100 flex items-center space-x-3">
             <Terminal className="w-6 h-6 text-ps-blue" />
             <span>Diagnostics</span>
           </h3>
-          <button
-            onClick={() => setShowLogs(!showLogs)}
-            className={cn(
-              "w-full py-6 rounded-2xl font-black uppercase italic tracking-tighter text-xl transition-all shadow-xl",
-              showLogs ? "bg-ps-blue text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
-            )}
-          >
-            {showLogs ? "Hide Logs" : "Show Logs"}
-          </button>
-          <p className="text-sm text-zinc-500 leading-relaxed">
-            View real-time output from the Next Menu background service for debugging and status tracking.
-          </p>
+
+          <div className="flex-1 space-y-6">
+            <p className="text-zinc-500 text-sm font-medium leading-relaxed">
+              View real-time output from the Next Menu background service for debugging.
+            </p>
+
+            <button
+              onClick={() => setShowLogs(true)}
+              className="w-full py-6 rounded-2xl font-black uppercase italic tracking-tighter text-xl transition-all shadow-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white border border-white/10"
+            >
+              Log Viewer
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1219,7 +1288,7 @@ function App() {
         if (res.ok) {
           const data = await res.json()
           setAutoloadStatus(data)
-          
+
           // Poll as long as countdown is active OR sequence is executing (not yet DONE)
           const isActive = data && (data.remaining >= 0 && data.current !== 'DONE')
           if (isActive) {
@@ -1236,7 +1305,10 @@ function App() {
 
 
   return (
-    <div className="min-h-screen ps5-bg text-zinc-100 font-ps5 flex flex-col md:flex-row md:overflow-hidden">
+    <div className={cn(
+      "min-h-screen ps5-bg text-zinc-100 font-ps5 flex",
+      isPS5 ? "flex-row overflow-hidden" : "flex-col md:flex-row md:overflow-hidden"
+    )}>
       {/* Toast Container */}
       <div className="fixed top-0 right-0 p-8 z-[2000] space-y-4 pointer-events-none">
         {toasts.map(t => (
@@ -1272,12 +1344,13 @@ function App() {
       </Modal>
 
       {autoloadStatus && autoloadStatus.remaining >= 0 && (
-        <AutoloadOverlay status={autoloadStatus} onCancel={handleAbort} onFinish={handleFinish} />
+        <AutoloadOverlay status={autoloadStatus} onCancel={handleAbort} onFinish={handleFinish} isPS5={isPS5} />
       )}
 
       {/* DESKTOP SIDEBAR */}
       <aside className={cn(
-        "hidden md:flex flex-col bg-black/40 backdrop-blur-3xl border-r border-white/5 transition-all duration-500 z-[100] h-screen shadow-[10px_0_30px_rgba(0,0,0,0.5)]",
+        "flex-col bg-black/40 backdrop-blur-3xl border-r border-white/5 transition-all duration-500 z-[100] h-screen shadow-[10px_0_30px_rgba(0,0,0,0.5)]",
+        isPS5 ? "flex" : "hidden md:flex",
         sidebarExpanded ? "w-80" : "w-24"
       )}>
         <div className="p-6 flex flex-col h-full">
@@ -1300,7 +1373,7 @@ function App() {
             <NavButton sidebar sidebarExpanded={sidebarExpanded} active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={LayoutDashboard} label="Dashboard" />
             <NavButton sidebar sidebarExpanded={sidebarExpanded} active={view === 'storage'} onClick={() => setView('storage')} icon={Database} label="Manage Payloads" />
             <NavButton sidebar sidebarExpanded={sidebarExpanded} active={view === 'autoload'} onClick={() => setView('autoload')} icon={RefreshCw} label="Autoload" />
-            <NavButton sidebar sidebarExpanded={sidebarExpanded} active={view === 'settings'} onClick={() => setView('settings')} icon={Info} label="Info" />
+            <NavButton sidebar sidebarExpanded={sidebarExpanded} active={view === 'settings'} onClick={() => setView('settings')} icon={Settings} label="Settings" />
           </nav>
 
           <div className="pt-6 border-t border-white/5">
@@ -1318,11 +1391,14 @@ function App() {
       </aside>
 
       {/* MOBILE BOTTOM NAV */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-[100] bg-black/80 backdrop-blur-2xl border-t border-white/5 h-20 flex items-center shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+      <nav className={cn(
+        "fixed bottom-0 inset-x-0 z-[100] bg-black/80 backdrop-blur-2xl border-t border-white/5 h-20 flex items-center shadow-[0_-10px_30px_rgba(0,0,0,0.5)]",
+        isPS5 ? "hidden" : "md:hidden"
+      )}>
         <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={LayoutDashboard} label="Dashboard" mobileLabel="HOME" />
         <NavButton showSeparator active={view === 'storage'} onClick={() => setView('storage')} icon={Database} label="Manage Payloads" mobileLabel="MANAGE" />
         <NavButton showSeparator active={view === 'autoload'} onClick={() => setView('autoload')} icon={RefreshCw} label="Autoload" mobileLabel="AUTO" />
-        <NavButton showSeparator active={view === 'settings'} onClick={() => setView('settings')} icon={Info} label="Info" mobileLabel="INFO" />
+        <NavButton showSeparator active={view === 'settings'} onClick={() => setView('settings')} icon={Settings} label="Settings" mobileLabel="SETTINGS" />
         <NavButton
           showSeparator
           active={view === 'donate'}
@@ -1334,8 +1410,14 @@ function App() {
       </nav>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex flex-col md:h-screen md:flex-1 relative md:min-h-0">
-        <main className="md:flex-1 md:overflow-y-auto custom-scrollbar p-6 md:p-16 pb-24 md:pb-16 max-w-[1800px] mx-auto w-full flex flex-col">
+      <div className={cn(
+        "flex flex-col relative",
+        isPS5 ? "h-screen flex-1 min-h-0" : "md:h-screen md:flex-1 md:min-h-0"
+      )}>
+        <main className={cn(
+          "custom-scrollbar pb-24 md:pb-16 max-w-[1800px] mx-auto w-full flex flex-col",
+          isPS5 ? "p-16 flex-1 overflow-y-auto" : "p-6 md:p-16 md:flex-1 md:overflow-y-auto"
+        )}>
           {view === 'dashboard' && (
             <div className="space-y-8 md:space-y-12">
               <h2 className="text-4xl font-extrabold text-white tracking-tight">
@@ -1376,7 +1458,7 @@ function App() {
           )}
 
           {view === 'storage' && (
-            <StorageHub payloads={payloads} onInstall={handleInstall} onDelete={handleDelete} onUpload={handleUpload} />
+            <StorageHub payloads={payloads} onInstall={handleInstall} onDelete={handleDelete} onUpload={handleUpload} ip={ip} />
           )}
 
           {view === 'autoload' && (
@@ -1391,14 +1473,11 @@ function App() {
       </div>
 
       {loading && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-lg z-[9999] flex flex-col items-center justify-center space-y-8 animate-fade-in">
-          <div className="relative">
-            <div className="w-32 h-32 border-8 border-ps-blue/10 rounded-full" />
-            <div className="absolute inset-0 w-32 h-32 border-8 border-ps-blue rounded-full border-t-transparent animate-spin shadow-[0_0_50px_rgba(0,149,255,0.5)]" />
-          </div>
+        <div className="fixed inset-0 bg-ps-black/95 z-[9999] flex flex-col items-center justify-center space-y-12">
+          <div className="ps5-robust-spinner" />
           <div className="text-center">
-            <h4 className="text-4xl font-extrabold text-white tracking-tight mb-3">{activeLoadingName || "Engaging Core"}</h4>
-            <p className="label-caps !text-[16px] animate-pulse text-ps-blue">LAUNCHING PAYLOAD. PLEASE WAIT...</p>
+            <h4 className="text-4xl font-extrabold text-white tracking-tight mb-4 uppercase italic">{activeLoadingName || "Engaging Core"}</h4>
+            <p className="label-caps !text-ps-blue tracking-[0.3em] font-black">LAUNCHING PAYLOAD...</p>
           </div>
         </div>
       )}

@@ -64,3 +64,14 @@ int ps5_launch_elf(const char* path) {
     close(fd);
     return 0;
 }
+
+extern int sceSystemServiceLaunchWebBrowser(const char *uri);
+
+int ps5_launch_browser(const char* uri) {
+    nm_log("[NextMenu] Launching browser: %s\n", uri);
+    if (sceSystemServiceLaunchWebBrowser(uri) != 0) {
+        nm_log("[NextMenu] !!! Failed to launch browser.\n");
+        return -1;
+    }
+    return 0;
+}
