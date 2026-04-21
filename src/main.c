@@ -157,14 +157,15 @@ struct UploadStatus {
     char temp_path[512];
 };
 
-static void read_next_config_values(int *enabled, long *repo_update, int *browser_open, int *auto_delay) {
+static void read_next_config_values(int *enabled, long *repo_update, int *browser_open, int *auto_delay, int *kill_disc_player) {
     FILE *f = fopen(NEXT_CONFIG_PATH, "r");
     char line[256];
-
+    
     *enabled = 0;
     *repo_update = 0;
     *browser_open = 1; /* Default on */
     *auto_delay = 5;   /* Default 5s */
+    *kill_disc_player = 1; /* Default on */
 
     if (!f) {
         return;
@@ -179,12 +180,14 @@ static void read_next_config_values(int *enabled, long *repo_update, int *browse
             *browser_open = atoi(line + 18);
         } else if (strncmp(line, "AUTOLOAD_DELAY=", 15) == 0) {
             *auto_delay = atoi(line + 15);
+        } else if (strncmp(line, "KILL_DISC_PLAYER_ON_STARTUP=", 28) == 0) {
+            *kill_disc_player = atoi(line + 28);
         }
     }
     fclose(f);
 }
 
-static int write_next_config_values(int enabled, long repo_update, int browser_open, int auto_delay) {
+static int write_next_config_values(int enabled, long repo_update, int browser_open, int auto_delay, int kill_disc_player) {
     FILE *f;
 
     mkdir(BASE_DATA_DIR, 0777);
@@ -197,6 +200,7 @@ static int write_next_config_values(int enabled, long repo_update, int browser_o
     fprintf(f, "LAST_REPOSITORY_UPDATE=%ld\n", repo_update);
     fprintf(f, "AUTO_BROWSER_OPEN=%d\n", browser_open ? 1 : 0);
     fprintf(f, "AUTOLOAD_DELAY=%d\n", auto_delay);
+    fprintf(f, "KILL_DISC_PLAYER_ON_STARTUP=%d\n", kill_disc_player ? 1 : 0);
     fclose(f);
     return 0;
 }
@@ -339,9 +343,9 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
                 }
 
                 if (enabled != -1) {
-                    int ex_en, ex_br, ex_del;
+                    int ex_en, ex_br, ex_del, ex_kill;
                     long ex_repo;
-                    read_next_config_values(&ex_en, &ex_repo, &ex_br, &ex_del);
+                    read_next_config_values(&ex_en, &ex_repo, &ex_br, &ex_del, &ex_kill);
 
                     /* Update individual fields from JSON if present */
                     int browser_open = ex_br;
@@ -365,7 +369,18 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
                         }
                     }
 
-                    if (write_next_config_values(enabled, ex_repo, browser_open, auto_delay) == 0) {
+                    int kill_disc = ex_kill;
+                    char *kill_pos = strstr(status->data, "\"KILL_DISC_PLAYER_ON_STARTUP\"");
+                    if (kill_pos) {
+                        char *val = strchr(kill_pos, ':');
+                        if (val) {
+                            val++; while (*val == ' ') val++;
+                            if (strncmp(val, "true", 4) == 0) kill_disc = 1;
+                            else if (strncmp(val, "false", 5) == 0) kill_disc = 0;
+                        }
+                    }
+
+                    if (write_next_config_values(enabled, ex_repo, browser_open, auto_delay, kill_disc) == 0) {
                         nm_log("[NextMenu] Saved config to %s\n", NEXT_CONFIG_PATH);
                     }
                     if (enabled == 0) nm_autoload_abort();
@@ -633,13 +648,13 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
             fclose(f);
         }
 
-        int config_enabled, config_browser, config_delay;
+        int config_enabled, config_browser, config_delay, config_kill;
         long config_repo;
-        read_next_config_values(&config_enabled, &config_repo, &config_browser, &config_delay);
+        read_next_config_values(&config_enabled, &config_repo, &config_browser, &config_delay, &config_kill);
 
         snprintf(response_buffer, sizeof(response_buffer), 
-                "{\"remaining\":%d,\"total\":%d,\"done\":%d,\"current\":\"%s\",\"list\":\"%s\",\"delay\":%d}", 
-                remaining, total, done, current, list_buf, config_delay);
+                "{\"remaining\":%d,\"total\":%d,\"done\":%d,\"current\":\"%s\",\"list\":\"%s\",\"delay\":%d,\"KILL_DISC_PLAYER_ON_STARTUP\":%s}", 
+                remaining, total, done, current, list_buf, config_delay, config_kill ? "true" : "false");
         resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
         MHD_add_response_header(resp, "Content-Type", "application/json");
     } else if (strcmp(url, ROUTE_AUTOLOAD_CLEAR) == 0) {
@@ -657,9 +672,9 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
         resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
         MHD_add_response_header(resp, "Content-Type", "application/json");
     } else if (strcmp(url, ROUTE_GET_CONFIG) == 0) {
-        int enabled = 0, browser_open = 1, auto_delay = 5;
+        int enabled = 0, browser_open = 1, auto_delay = 5, kill_disc = 1;
         long last_repo_update = 0;
-        read_next_config_values(&enabled, &last_repo_update, &browser_open, &auto_delay);
+        read_next_config_values(&enabled, &last_repo_update, &browser_open, &auto_delay, &kill_disc);
 
         /* Get list */
         char list_buf[4096] = {0};
@@ -679,9 +694,9 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
 
         snprintf(response_buffer, sizeof(response_buffer),
             "{\"AUTOLOAD_ENABLED\":%s,\"AUTOLOAD_LIST\":\"%s\",\"LAST_REPOSITORY_UPDATE\":%ld,"
-            "\"AUTO_BROWSER_OPEN\":%s,\"AUTOLOAD_DELAY\":%d}",
+            "\"AUTO_BROWSER_OPEN\":%s,\"AUTOLOAD_DELAY\":%d,\"KILL_DISC_PLAYER_ON_STARTUP\":%s}",
             enabled ? "true" : "false", list_buf, last_repo_update,
-            browser_open ? "true" : "false", auto_delay);
+            browser_open ? "true" : "false", auto_delay, kill_disc ? "true" : "false");
         resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
         MHD_add_response_header(resp, "Content-Type", "application/json");
     } else if (strcmp(url, "/events") == 0) {
@@ -731,6 +746,16 @@ int main(int argc, char *argv[]) {
         nm_log("[NextMenu] User Service initialized.\n");
     }
 
+    /* Start Autoload Sequence (if config exists) */
+    int ex_en, ex_br = 1, ex_del = 5, ex_kill = 1;
+    long ex_repo = 0;
+    read_next_config_values(&ex_en, &ex_repo, &ex_br, &ex_del, &ex_kill);
+
+    /* Kill Disc Player if running (BD-JB host) and enabled in config */
+    if (ex_kill) {
+        ps5_kill_disc_player();
+    }
+
     /* Signal Resilience */
     signal(SIGPIPE, SIG_IGN);
     signal(SIGHUP, SIG_IGN);
@@ -753,9 +778,6 @@ int main(int argc, char *argv[]) {
     payload_mgr_repository_ensure_fresh(0);
 
     /* Automatically open browser to the menu URL (if enabled) */
-    int ex_en, ex_br = 1, ex_del = 5;
-    long ex_repo = 0;
-    read_next_config_values(&ex_en, &ex_repo, &ex_br, &ex_del);
 
     /* Startup Notification - Only show if browser autostart is off */
     char current_ip[64] = "unknown";

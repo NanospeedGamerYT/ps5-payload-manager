@@ -1033,6 +1033,25 @@ const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs }) => {
               </button>
             </div>
 
+            <div className="flex items-center justify-between p-6 bg-white/5 rounded-2xl border border-white/10">
+              <div className="space-y-1">
+                <p className="font-bold text-white uppercase text-sm tracking-tight">Kill Disc Player</p>
+                <p className="text-xs text-zinc-500 max-w-[200px]">Terminate Disc Player app on startup.</p>
+              </div>
+              <button
+                onClick={() => onSaveConfig({ KILL_DISC_PLAYER_ON_STARTUP: !config.KILL_DISC_PLAYER_ON_STARTUP })}
+                className={cn(
+                  "w-16 h-8 rounded-full transition-all relative overflow-hidden p-1",
+                  config.KILL_DISC_PLAYER_ON_STARTUP !== false ? "bg-ps-blue" : "bg-white/10"
+                )}
+              >
+                <div className={cn(
+                  "w-6 h-6 bg-white rounded-full transition-all shadow-lg",
+                  config.KILL_DISC_PLAYER_ON_STARTUP !== false ? "translate-x-8" : "translate-x-0"
+                )} />
+              </button>
+            </div>
+
             <div className="space-y-6 p-6 bg-white/5 rounded-2xl border border-white/10 transition-all">
               <div className="flex justify-between items-center">
                 <div className="space-y-1">
