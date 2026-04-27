@@ -31,6 +31,7 @@ frontend-build:
 	cd frontend && npm install && npm run build
 	@VERSION=$$(grep '#define MENU_VERSION' include/next_menu.h | awk '{print $$3}' | tr -d '"'); \
 	COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown"); \
+	git diff --quiet || COMMIT="DEV"; \
 	DATE=$$(date -u +"%Y-%m-%d %H:%M UTC"); \
 	TITLE="Next Menu v$$VERSION ($$COMMIT, built at $$DATE)"; \
 	echo "Updating title in index.html to: $$TITLE"; \
