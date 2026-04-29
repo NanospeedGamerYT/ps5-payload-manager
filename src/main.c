@@ -989,6 +989,7 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
     char current[128];
     pldmgr_autoload_get_status(&total, &done, current);
     int remaining = pldmgr_autoload_get_remaining_seconds();
+    long long remaining_ms = pldmgr_autoload_get_remaining_ms();
 
     char list_buf[4096] = "";
     FILE *f = fopen(AUTOLOAD_CONFIG_PATH, "r");
@@ -1021,9 +1022,9 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
     resp = alloc_response_buffer(&resp_buf);
     if (!resp) {
       snprintf(resp_buf, RESPONSE_BUFFER_SIZE,
-               "{\"remaining\":%d,\"total\":%d,\"done\":%d,\"current\":\"%s\","
+               "{\"remaining\":%d,\"remaining_ms\":%lld,\"total\":%d,\"done\":%d,\"current\":\"%s\","
                "\"list\":\"%s\",\"delay\":%d,\"KILL_DISC_PLAYER_ON_STARTUP\":%s,\"SCAN_USB_PAYLOADS\":%s}",
-               remaining, total, done, current_escaped, list_escaped, config_delay,
+               remaining, remaining_ms, total, done, current_escaped, list_escaped, config_delay,
                config_kill ? "true" : "false", config_usb ? "true" : "false");
       resp = MHD_create_response_from_buffer(strlen(resp_buf),
                                              (void *)resp_buf,

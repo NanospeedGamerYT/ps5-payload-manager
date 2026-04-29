@@ -293,8 +293,10 @@ function App() {
 
           // Poll as long as countdown is active OR sequence is executing (not yet DONE)
           const isActive = data && (data.remaining >= 0 && data.current !== 'DONE')
-          const delay = isActive ? (data.remaining > 0 ? 1000 : 500) : 5000
-          statusTimeout = setTimeout(poll, delay)
+          if (isActive) {
+            const delay = data.remaining > 0 ? 200 : 500
+            statusTimeout = setTimeout(poll, delay)
+          }
           return
         }
       } catch (e) { }

@@ -1,15 +1,42 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react'
 import { cn } from '../../utils/helpers'
 import PayloadName from '../ui/PayloadName'
 
 const AutoloadOverlay = ({ status, onCancel, onFinish, isPS5 }) => {
-  const isCountdown = status.remaining > 0;
-  const isExecuting = status.remaining === 0 && status.current !== 'DONE';
+  const isCountdown = status.remaining > 0 || (status.remaining === 0 && !status.current);
+  const isExecuting = status.remaining === 0 && !!status.current && status.current !== 'DONE';
   const isDone = status.current === 'DONE';
   const payloadList = status.list ? status.list.split(',') : [];
   const listRef = useRef(null);
   const progress = status.total > 0 ? (status.done / status.total) : 0;
+
+  const [localMs, setLocalMs] = useState(status.remaining_ms ?? (status.remaining * 1000));
+
+  useEffect(() => {
+    setLocalMs(status.remaining_ms ?? (status.remaining * 1000));
+  }, [status.remaining_ms, status.remaining]);
+
+  const isActiveRef = useRef(false);
+  useEffect(() => {
+    isActiveRef.current = (status.remaining_ms ?? (status.remaining * 1000)) < ((status.delay || 5) * 1000);
+  }, [status.remaining_ms, status.remaining, status.delay]);
+
+  useEffect(() => {
+    if (!isCountdown) return;
+    let lastTime = performance.now();
+    let frameId;
+    const animate = (time) => {
+      const delta = time - lastTime;
+      lastTime = time;
+      if (isActiveRef.current) {
+        setLocalMs(prev => Math.max(0, prev - delta));
+      }
+      frameId = requestAnimationFrame(animate);
+    };
+    frameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameId);
+  }, [isCountdown]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -53,12 +80,12 @@ const AutoloadOverlay = ({ status, onCancel, onFinish, isPS5 }) => {
                       cx="112" cy="112" r="100"
                       fill="none" stroke="currentColor" strokeWidth="8"
                       strokeDasharray="628"
-                      strokeDashoffset={628 - (628 * (status.remaining / (status.delay || 5)))}
-                      className="text-ps-blue transition-all duration-1000 ease-linear"
+                      strokeDashoffset={628 - (628 * (localMs / ((status.delay || 5) * 1000)))}
+                      className="text-ps-blue"
                     />
                   </svg>
                   <span className="text-8xl font-bold text-white tabular-nums leading-none">
-                    {status.remaining}
+                    {(localMs / 1000).toFixed(1)}
                   </span>
                 </div>
                 <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm">Waiting for manual abort...</p>

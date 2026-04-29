@@ -5,6 +5,15 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/time.h>
+
+static volatile long long countdown_end_time = 0;
+
+long long get_current_time_ms() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (long long)(tv.tv_sec) * 1000 + (tv.tv_usec) / 1000;
+}
 
 #include "pldmgr.h"
 #include "autoload.h"
@@ -13,6 +22,7 @@
 
 static volatile int abort_flag = 0;
 static volatile int remaining_seconds = -1;
+static volatile int is_executing = 0;
 static pthread_t autoload_thread;
 
 static char autoload_current_name[128] = "";
@@ -21,6 +31,13 @@ static int autoload_done_count = 0;
 
 int pldmgr_autoload_get_remaining_seconds() {
     return remaining_seconds;
+}
+
+long long pldmgr_autoload_get_remaining_ms() {
+    if (countdown_end_time == 0) return (long long)remaining_seconds * 1000;
+    long long now = get_current_time_ms();
+    if (now >= countdown_end_time) return 0;
+    return countdown_end_time - now;
 }
 
 void pldmgr_autoload_get_status(int *total, int *done, char *current) {
@@ -54,6 +71,18 @@ void* pldmgr_autoload_worker(void* arg) {
 
     if (!enabled || !has_config) return NULL;
 
+    remaining_seconds = auto_delay;
+
+    if (browser_open) {
+        pldmgr_log("[Autoload] Browser Mode: Waiting 3s for browser to launch...\n");
+        for (int k = 0; k < 30; k++) {
+            if (abort_flag) return NULL;
+            usleep(100000);
+        }
+    }
+
+    countdown_end_time = get_current_time_ms() + (long long)auto_delay * 1000;
+
     /* Perform countdown for the specified delay in all modes */
     if (auto_delay > 0) {
         int klog_fd = -1;
@@ -79,35 +108,38 @@ void* pldmgr_autoload_worker(void* arg) {
         }
         
         char klog_buf[2048];
-        for (int i = auto_delay; i > 0; i--) {
-            remaining_seconds = i;
-            for (int j = 0; j < 10; j++) {
-                if (abort_flag) {
-                    if (klog_fd >= 0) close(klog_fd);
-                    remaining_seconds = -1;
-                    return NULL;
-                }
+        long long remaining_ms;
+        while ((remaining_ms = countdown_end_time - get_current_time_ms()) > 0) {
+            remaining_seconds = (int)((remaining_ms + 999) / 1000);
+            if (abort_flag) {
+                if (klog_fd >= 0) close(klog_fd);
+                countdown_end_time = 0;
+                remaining_seconds = -1;
+                return NULL;
+            }
 
-                if (klog_fd >= 0) {
-                    ssize_t n = read(klog_fd, klog_buf, sizeof(klog_buf) - 1);
-                    if (n > 0) {
-                        klog_buf[n] = 0;
-                        if (strstr(klog_buf, "onPSButtonPressed")) {
-                            pldmgr_log("[Autoload] ABORTED via PS Button.\n");
-                            pldmgr_notify("Autoload Aborted");
-                            abort_flag = 1;
-                            close(klog_fd);
-                            remaining_seconds = -1;
-                            return NULL;
-                        }
+            if (klog_fd >= 0) {
+                ssize_t n = read(klog_fd, klog_buf, sizeof(klog_buf) - 1);
+                if (n > 0) {
+                    klog_buf[n] = 0;
+                    if (strstr(klog_buf, "onPSButtonPressed")) {
+                        pldmgr_log("[Autoload] ABORTED via PS Button.\n");
+                        pldmgr_notify("Autoload Aborted");
+                        abort_flag = 1;
+                        close(klog_fd);
+                        countdown_end_time = 0;
+                        remaining_seconds = -1;
+                        return NULL;
                     }
                 }
-                usleep(100000); /* 100ms */
             }
+            usleep(100000); /* 100ms */
         }
         if (klog_fd >= 0) close(klog_fd);
     }
+    countdown_end_time = 0;
     remaining_seconds = 0;
+    is_executing = 1;
     
     FILE *f = fopen(AUTOLOAD_CONFIG_PATH, "r");
     if (!f) {
@@ -129,11 +161,6 @@ void* pldmgr_autoload_worker(void* arg) {
     
     char line[256];
     while (fgets(line, sizeof(line), f)) {
-        if (abort_flag) {
-            pldmgr_log("[Autoload] ABORTED during execution.\n");
-            break;
-        }
-
         line[strcspn(line, "\r\n")] = 0;
         if (strlen(line) == 0) continue;
 
@@ -141,11 +168,7 @@ void* pldmgr_autoload_worker(void* arg) {
             int delay = atoi(line + 1);
             if (delay > 0) {
                 pldmgr_log("[Autoload] Delaying for %d ms...\n", delay);
-                /* Sleep in 100ms chunks to check for abort_flag */
-                for (int d = 0; d < delay; d += 100) {
-                    if (abort_flag) break;
-                    usleep(100000);
-                }
+                usleep(delay * 1000);
             }
         } else {
             char full_path[512];
@@ -165,11 +188,13 @@ void* pldmgr_autoload_worker(void* arg) {
     pldmgr_log("[Autoload] Sequence complete.\n");
     strcpy(autoload_current_name, "DONE");
     remaining_seconds = 0;
+    is_executing = 0;
     return NULL;
 }
 
 int pldmgr_autoload_start() {
     abort_flag = 0;
+    is_executing = 0;
     if (pthread_create(&autoload_thread, NULL, pldmgr_autoload_worker, NULL) != 0) {
         pldmgr_log("[Autoload] !!! Failed to create background thread\n");
         return -1;
@@ -179,11 +204,14 @@ int pldmgr_autoload_start() {
 }
 
 void pldmgr_autoload_abort() {
-    abort_flag = 1;
+    if (!is_executing) {
+        abort_flag = 1;
+    }
 }
 
 void pldmgr_autoload_reset() {
     remaining_seconds = -1;
+    is_executing = 0;
     autoload_total_count = 0;
     autoload_done_count = 0;
     strcpy(autoload_current_name, "");
