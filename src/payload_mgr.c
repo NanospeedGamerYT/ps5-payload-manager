@@ -1422,6 +1422,33 @@ static int is_allowed_usb_path(const char *path) {
         return -1;
     }
 
+    static int parse_version_part(const char **p) {
+        int val = 0;
+        while (**p >= '0' && **p <= '9') {
+            val = val * 10 + (**p - '0');
+            (*p)++;
+        }
+        if (**p == '.') (*p)++;
+        return val;
+    }
+
+    static int compare_versions(const char *v1, const char *v2) {
+        const char *p1 = v1;
+        const char *p2 = v2;
+        
+        int maj1 = parse_version_part(&p1);
+        int maj2 = parse_version_part(&p2);
+        if (maj1 != maj2) return maj1 - maj2;
+        
+        int min1 = parse_version_part(&p1);
+        int min2 = parse_version_part(&p2);
+        if (min1 != min2) return min1 - min2;
+        
+        int pat1 = parse_version_part(&p1);
+        int pat2 = parse_version_part(&p2);
+        return pat1 - pat2;
+    }
+
     static int check_self_update_recursive(const char *dir_path, int depth, int max_depth, char *out_path, size_t out_size) {
         DIR *dir;
         struct dirent *entry;
@@ -1445,7 +1472,7 @@ static int is_allowed_usb_path(const char *path) {
                 if (strstr(entry->d_name, "payload-manager") || strstr(entry->d_name, "pldmgr")) {
                     char version[64];
                     if (get_elf_pldmgr_version(full_path, version, sizeof(version)) == 0) {
-                        if (strcmp(version, MENU_VERSION) != 0) {
+                        if (compare_versions(version, MENU_VERSION) > 0) {
                             strncpy(out_path, full_path, out_size);
                             closedir(dir);
                             return 0;
