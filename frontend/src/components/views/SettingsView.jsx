@@ -1,23 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Zap, Terminal, X, ChevronRight } from 'lucide-react'
 import { cn } from '../../utils/helpers'
-import LogViewer from './LogViewer'
 
-const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs }) => {
-  const [showLogs, setShowLogs] = useState(false)
-
+const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs, showLogs, setShowLogs }) => {
   const autoOpen = config.AUTO_BROWSER_OPEN !== false
   const autoInstall = config.AUTO_INSTALL_APP !== false
   const autoloadDelay = config.AUTOLOAD_DELAY || 5
-
-  useEffect(() => {
-    if (!showLogs) return
-    const eventSource = new EventSource('/events')
-    eventSource.onmessage = (e) => {
-      setLogs(prev => [...prev, e.data].slice(-100))
-    }
-    return () => eventSource.close()
-  }, [showLogs, setLogs])
 
   const SettingRow = ({ title, description, children, icon: Icon }) => (
     <div className="flex items-center justify-between p-8 bg-white/[0.03] rounded-3xl border border-white/10 hover:border-ps-blue/30 transition-all group">
@@ -179,25 +167,6 @@ const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs }) => {
         </button>
       </section>
 
-      {showLogs && (
-        <div className="fixed inset-0 z-[2000] bg-black flex flex-col duration-300">
-          <div className="p-8 border-b border-white/10 flex items-center justify-between bg-black/80">
-            <div className="flex items-center space-x-4">
-              <Terminal className="w-8 h-8 text-ps-blue" />
-              <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">Logs</h3>
-            </div>
-            <button
-              onClick={() => setShowLogs(false)}
-              className="p-4 rounded-2xl bg-white/5 hover:bg-red-600 hover:text-white transition-all border border-white/10 group"
-            >
-              <X className="w-8 h-8 transition-transform group-hover:rotate-90" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <LogViewer logs={logs} />
-          </div>
-        </div>
-      )}
     </div>
   )
 }

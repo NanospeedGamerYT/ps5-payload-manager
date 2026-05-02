@@ -8,7 +8,9 @@ import {
   RefreshCw,
   Package,
   Heart,
-  Menu
+  Menu,
+  Terminal,
+  X
 } from 'lucide-react'
 
 import './App.css'
@@ -30,6 +32,7 @@ import SettingsView from './components/views/SettingsView'
 import DonateView from './components/views/DonateView'
 import AutoloadOverlay from './components/views/AutoloadOverlay'
 import MoveFromUsbView from './components/views/MoveFromUsbView'
+import LogViewer from './components/views/LogViewer'
 
 function App() {
   const [view, setView] = useState('dashboard')
@@ -48,6 +51,16 @@ function App() {
   const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null })
   const [moveFromUsbPath, setMoveFromUsbPath] = useState(null)
   const [storageScrollTarget, setStorageScrollTarget] = useState(null)
+  const [showLogs, setShowLogs] = useState(false)
+
+  useEffect(() => {
+    if (!showLogs) return
+    const eventSource = new EventSource('/events')
+    eventSource.onmessage = (e) => {
+      setLogs(prev => [...prev, e.data].slice(-200))
+    }
+    return () => eventSource.close()
+  }, [showLogs])
   const [isOffline, setIsOffline] = useState(false)
 
 
@@ -518,9 +531,16 @@ function App() {
           )}
 
           {view === 'settings' && (
-            <SettingsView config={config} onSaveConfig={handleSaveConfig} isPS5={isPS5} logs={logs} setLogs={setLogs} />
-          )}
-          {view === 'donate' && <DonateView />}
+            <SettingsView
+              config={config}
+              onSaveConfig={handleSaveConfig}
+              isPS5={isPS5}
+              logs={logs}
+              setLogs={setLogs}
+              showLogs={showLogs}
+              setShowLogs={setShowLogs}
+            />
+          )}{view === 'donate' && <DonateView />}
         </main>
       </div>
 
@@ -530,6 +550,25 @@ function App() {
           <div className="text-center">
             <h4 className="text-4xl font-extrabold text-white tracking-tight mb-4 uppercase italic">{activeLoadingName || "Engaging Core"}</h4>
             <p className="label-caps !text-ps-blue tracking-[0.3em] font-black">LAUNCHING PAYLOAD...</p>
+          </div>
+        </div>
+      )}
+      {showLogs && (
+        <div className="fixed inset-0 z-[9999] bg-[#08080a] flex flex-col animate-in fade-in duration-300">
+          <div className="p-6 md:p-8 border-b border-white/10 flex items-center justify-between bg-[#08080a]/95 backdrop-blur-xl sticky top-0 z-10">
+            <div className="flex items-center space-x-4">
+              <Terminal className="w-8 h-8 text-ps-blue" />
+              <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">Logs</h3>
+            </div>
+            <button
+              onClick={() => setShowLogs(false)}
+              className="p-4 rounded-2xl bg-white/5 hover:bg-red-600 hover:text-white transition-all border border-white/10 group"
+            >
+              <X className="w-8 h-8 transition-transform group-hover:rotate-90" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden bg-black/20">
+            <LogViewer logs={logs} />
           </div>
         </div>
       )}

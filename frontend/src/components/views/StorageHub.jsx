@@ -115,7 +115,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
           </span>
         </div>
 
-        <div className={cn("grid gap-4", isPS5 ? "grid-cols-2" : "grid-cols-1")}>
+        <div className={cn("grid gap-4", isPS5 ? "grid-cols-2" : "grid-cols-1 md:grid-cols-2")}>
           {internalPayloads.length === 0 ? (
             <div className="col-span-full py-20 border-2 border-dashed border-white/5 rounded-ps-3xl flex flex-col items-center justify-center space-y-4 bg-white/[0.01]">
               <Package className="w-16 h-16 text-white/5" />
@@ -243,7 +243,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
           </span>
         </div>
 
-        <div className={cn("grid gap-4", isPS5 ? "grid-cols-2" : "grid-cols-1")}>
+        <div className={cn("grid gap-4", isPS5 ? "grid-cols-2" : "grid-cols-1 md:grid-cols-2")}>
           {payloads.filter(p => p.includes('/mnt/usb')).length === 0 ? (
             <div className="col-span-full py-20 border-2 border-dashed border-white/5 rounded-ps-3xl flex flex-col items-center justify-center space-y-6 bg-white/[0.01]">
               <div className="relative">
