@@ -748,7 +748,7 @@ static int is_allowed_usb_path(const char *path) {
             return;
         }
 
-        pldmgr_log("[PLDMGR] Scanning: %s\n", dir_path);
+        // pldmgr_log("[PLDMGR] Scanning: %s\n", dir_path);
 
         while ((entry = readdir(dir)) != NULL) {
             char full_path[512];
