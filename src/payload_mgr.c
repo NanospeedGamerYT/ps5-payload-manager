@@ -944,60 +944,9 @@ static int is_allowed_usb_path(const char *path) {
                             }
                         }
                     }
-                    /* Fallback for pre-source_name sidecars: if install_source is
-                     * "repository" and install_source_detail has a URL, use its
-                     * hostname so that old third-party installs still get a badge. */
-                    if (!sn_val[0]) {
-                        char i_src[64] = "";
-                        const char *is_key = strstr(sc_json, "\"install_source\"");
-                        if (is_key) {
-                            const char *colon = strchr(is_key + 16, ':');
-                            if (colon) {
-                                const char *q = colon + 1;
-                                while (*q == ' ' || *q == '\t') q++;
-                                if (*q == '"') {
-                                    q++;
-                                    size_t pos = 0;
-                                    while (*q && *q != '"' && pos < sizeof(i_src) - 1)
-                                        i_src[pos++] = *q++;
-                                    i_src[pos] = '\0';
-                                }
-                            }
-                        }
-                        if (strcmp(i_src, "repository") == 0) {
-                            char detail_url[512] = "";
-                            const char *id_key = strstr(sc_json, "\"install_source_detail\"");
-                            if (id_key) {
-                                const char *colon = strchr(id_key + 23, ':');
-                                if (colon) {
-                                    /* Skip "http://" or "https://" if next char is not '"' */
-                                    const char *q = colon + 1;
-                                    while (*q == ' ' || *q == '\t') q++;
-                                    if (*q == '"') {
-                                        q++;
-                                        size_t pos = 0;
-                                        while (*q && *q != '"' && pos < sizeof(detail_url) - 1)
-                                            detail_url[pos++] = *q++;
-                                        detail_url[pos] = '\0';
-                                    }
-                                }
-                            }
-                            /* Only badge if it's NOT the official repository */
-                            if (detail_url[0] &&
-                                strstr(detail_url, "itsplk.github.io") == NULL) {
-                                /* Extract hostname from URL */
-                                const char *host = strstr(detail_url, "://");
-                                host = host ? host + 3 : detail_url;
-                                size_t pos = 0;
-                                while (*host && *host != '/' && *host != ':' &&
-                                       pos < sizeof(sn_val) - 1)
-                                    sn_val[pos++] = *host++;
-                                sn_val[pos] = '\0';
-                            }
-                        }
-                    }
+
                     free(sc_json);
-                    if (!sn_val[0]) continue; /* official source — no badge */
+                    if (!sn_val[0]) continue; /* local/uploaded payload — no badge */
 
                     /* key = filename without trailing ".json" */
                     char key[300];

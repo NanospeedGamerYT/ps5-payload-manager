@@ -115,7 +115,7 @@ app.get('/list_payloads', (req, res) => {
       "/mnt/usb0/pldmgr/linux_loader.elf"
     ],
     meta: {
-      // payloads with no entry here = official / no badge shown
+      // payloads with no entry here = local/direct upload (no badge shown)
       "kstuff.elf": {
         source_name: "Community Payloads",
         install_source: "repository",
