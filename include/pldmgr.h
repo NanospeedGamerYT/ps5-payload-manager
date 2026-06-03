@@ -46,10 +46,9 @@
   "https://itsplk.github.io/ps5-payloads-mirror/payloads.json"
 #define REPOSITORY_REFRESH_INTERVAL_SEC 86400
 
-/* Logging */
+/* Logging (implementation in log_server.c) */
 void pldmgr_log(const char *fmt, ...);
 int pldmgr_server_is_active();
-int pldmgr_read_config_bool(const char *key, int default_val);
 
 #include "autoload.h"
 #include "notification.h"
