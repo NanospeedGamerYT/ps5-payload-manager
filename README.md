@@ -33,7 +33,7 @@ If you are using an older version and don't want to update the entire autoloader
 ### Standalone / Manual Loading
 You can also manually load the manager like any other `.elf` file. Grab the latest version from the [Releases](https://github.com/itsPLK/ps5-payload-manager/releases) page.
 
-## Custom Repositories
+## Custom  Repositories
 You can add third-party payload repositories to the manager. To learn how to create your own repository JSON and host it, see the [Custom Repositories Guide](CUSTOM_REPOSITORIES.md).
 
 ## Credits
